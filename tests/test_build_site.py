@@ -45,7 +45,8 @@ class BuildSiteTests(unittest.TestCase):
 </head><body><h1>{{creator_name}} {{brand_name}} {{handle}}</h1><p>{{hero_description}}</p><p>{{creator_description}}</p>
 <img src="{{creator_image}}" alt="{{site_name}}"><a href="{{youtube}}">YouTube</a><a href="{{youtube_videos}}">Vídeos</a><a href="{{instagram}}">Instagram</a><a href="{{twitch}}">Twitch</a><a href="{{trailer}}">Trailer</a>
 <div id="videos-list"><!-- site:videos:start --><!-- site:videos:end --></div>
-<script src="navigation.js"></script><script src="config.js"></script><script src="script.js"></script></body></html>''', encoding="utf-8")
+<div data-instagram-embed hidden><iframe data-src="{{instagram_embed}}" title="Instagram"></iframe></div>
+<script src="navigation.js"></script><script src="instagram.js" defer></script><script src="config.js"></script><script src="script.js"></script></body></html>''', encoding="utf-8")
         (self.root / "data").mkdir()
         self.write_feed([self.video(1), self.video(2)])
 
@@ -81,6 +82,8 @@ class BuildSiteTests(unittest.TestCase):
         self.assertIn('<link rel="canonical" href="https://ozecaoo.com/"', page)
         self.assertIn('name="twitter:card" content="summary_large_image"', page)
         self.assertIn('property="og:image" content="https://ozecaoo.com/assets/social-preview-v1.jpg"', page)
+        self.assertIn('data-src="https://www.instagram.com/ozecaoo/embed/"', page)
+        self.assertTrue((output / "instagram.js").exists())
         self.assertEqual(page.count('class="video-tile"'), 2)
         self.assertIn("09/10/2026", page, "Published date must use São Paulo timezone")
         self.assertIn("/vi_webp/video000001/maxresdefault.webp", page)
@@ -180,7 +183,7 @@ class BuildSiteTests(unittest.TestCase):
 
     def test_unsafe_config_or_output_is_rejected_without_deleting_anything(self):
         original = copy.deepcopy(self.config)
-        for key, value in (("siteUrl", "http://ozecaoo.com/"), ("siteUrl", "https://ozecaoo.com/wrong/"), ("youtube", "javascript:alert(1)"), ("maxFeedVideos", 300), ("trailerVideoId", "../unsafe")):
+        for key, value in (("siteUrl", "http://ozecaoo.com/"), ("siteUrl", "https://ozecaoo.com/wrong/"), ("youtube", "javascript:alert(1)"), ("instagram", "https://example.com/ozecaoo/"), ("instagram", "https://www.instagram.com/p/some-post/"), ("instagram", "https://www.instagram.com/ozecaoo/?next=other"), ("maxFeedVideos", 300), ("trailerVideoId", "../unsafe")):
             with self.subTest(key=key, value=value):
                 self.config = {**copy.deepcopy(original), key: value}
                 self.write_config()

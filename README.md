@@ -29,18 +29,29 @@ A consulta ao YouTube gera `dist/data/videos.json`. Os arquivos gerados em `dist
 | Instagram | https://www.instagram.com/ozecaoo/ |
 | Twitch | https://www.twitch.tv/ozecaoo |
 | Apresentação | https://youtu.be/ItDJkbW2M4A |
-| Discord | Em breve, sem link ativo |
+| Discord | Oculto até configurar um link válido |
 
 - `index.html`: estrutura e modelo do conteúdo; os campos de identidade e SEO são preenchidos no build.
 - `styles.css`: cores, composição, responsividade e animações.
 - `script.js`: player, thumbnails e atualização dos cards no navegador.
 - `navigation.js`: menu mobile com os links do desktop e fechamento por seleção, clique fora ou Escape.
+- `instagram.js`: carregamento da prévia oficial do perfil e ajuste de altura pelas mensagens do Instagram.
 - `assets/`: artes e ícones oficiais, usados também pelo manifest gerado.
 - `data/videos.json`: reserva revisada e versionada de publicações do canal. Atualizações automáticas não fazem commits nesse arquivo.
 
-O layout usa CSS e SVG inline, sem bibliotecas, fontes externas ou analytics. O player de `youtube-nocookie.com` só é criado após um clique.
+O layout usa CSS e SVG inline, sem bibliotecas, fontes externas ou analytics próprios. O player de `youtube-nocookie.com` só é criado após um clique.
 
-A navbar acompanha a rolagem e mantém as seções abaixo dela ao navegar pelas âncoras. O botão circular de retorno aparece após 400 px ou 75% da altura da tela, o que for maior. Nas redes, os ícones são os links, com alvos de toque e nomes acessíveis. A apresentação mantém o play visível no canto inferior esquerdo; sem JavaScript, a própria capa abre o vídeo no YouTube.
+A página segue a ordem: saudação → últimos vídeos → apresentação → Instagram → redes. Vídeos têm maior destaque; apresentação e redes usam títulos e espaçamentos mais contidos. A navbar acompanha a rolagem, indica a seção atual e mantém os destinos abaixo dela ao navegar pelas âncoras. O botão circular de retorno aparece após 400 px ou 75% da altura da tela, o que for maior. Nas redes, os ícones são os links, com alvos de toque e nomes acessíveis; o Discord permanece oculto enquanto a URL estiver vazia. A apresentação mantém o play visível no canto inferior esquerdo; sem JavaScript, a própria capa abre o vídeo no YouTube.
+
+## Prévia do Instagram
+
+A seção usa a incorporação oficial do **perfil**, derivada do link `instagram` de `site.config.json`. As publicações são servidas pelo próprio Instagram, sem cadastrar posts manualmente, consultar uma API autenticada ou manter tokens. O visual interno e a atualização/cache são controlados pelo Instagram; a quantidade de posts não é um contrato do site.
+
+O iframe só recebe seu endereço quando a seção chega a 320 px da área visível. A altura acompanha as mensagens oficiais `MEASURE`, aceitas apenas da origem HTTPS do Instagram e da janela daquele iframe, com limites para valores inválidos. A altura inicial reserva espaço antes do carregamento; a rolagem nativa do iframe fica disponível caso o serviço mude seu comportamento. O site não carrega o SDK de embeds separadamente.
+
+O acesso **Ver no Instagram** permanece disponível mesmo com o serviço bloqueado ou JavaScript desabilitado. Sem JavaScript, o espaço vazio da incorporação fica oculto. O perfil precisa continuar público, disponível e com incorporações permitidas. Consulte a [documentação oficial de incorporações](https://developers.facebook.com/docs/instagram-platform/oembed/).
+
+Se o Instagram não enviar uma medida válida em 12 segundos, a caixa da prévia é recolhida, preservando o link. Uma resposta válida posterior restaura a prévia, sem nova consulta ou atualização da página.
 
 ## Atualização dos vídeos e build
 

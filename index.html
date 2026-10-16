@@ -176,9 +176,10 @@
         </button>
         <div class="header-navigation" id="header-navigation">
           <nav class="header-nav" aria-label="Navegação principal">
-            <a href="#redes">Redes</a>
-            <a href="#apresentacao">Conheça</a>
             <a href="#videos">Vídeos</a>
+            <a href="#apresentacao">Conheça</a>
+            <a href="#instagram">Instagram</a>
+            <a href="#redes">Redes</a>
           </nav>
           <a
             class="header-out"
@@ -225,6 +226,103 @@
           <p class="hello-description">{{hero_description}}</p>
         </section>
       </div>
+
+      <section
+        class="latest container"
+        id="videos"
+        aria-labelledby="latest-title"
+      >
+        <div class="latest-top">
+          <div class="latest-title-group">
+            <h2 id="latest-title">Últimos vídeos</h2>
+            <p>Vídeos e lives que rolaram no canal.</p>
+          </div>
+          <a
+            class="see-all"
+            data-link="youtube"
+            href="{{youtube}}"
+            target="_blank"
+            rel="noopener noreferrer"
+            ><svg aria-hidden="true"><use href="#icon-youtube" /></svg> Acessar
+            canal</a
+          >
+        </div>
+        <div id="videos-list" class="videos-grid" aria-live="polite">
+          <!-- site:videos:start -->
+          <!-- site:videos:end -->
+        </div>
+      </section>
+
+      <section
+        class="spotlight"
+        id="apresentacao"
+        aria-labelledby="spotlight-title"
+      >
+        <div class="container spotlight-layout">
+          <div class="spotlight-copy">
+            <div class="spotlight-art-line" aria-hidden="true"></div>
+            <h2 id="spotlight-title">
+              Chegou agora<span class="red-period">?</span>
+            </h2>
+            <p>Gravei esse vídeo pra apresentar o canal. Dá o play aí.</p>
+          </div>
+          <div class="spotlight-video" id="trailer-frame">
+            <a
+              id="play-trailer"
+              class="trailer-trigger"
+              data-link="trailer"
+              href="{{trailer}}"
+              target="_blank"
+              rel="noopener noreferrer"
+              aria-label="Assistir à apresentação do {{brand_name}}"
+            >
+              <img
+                src="assets/boas-vindas.webp"
+                width="1120"
+                height="630"
+                loading="lazy"
+                alt="Thumbnail do vídeo Bem-vindo ao {{brand_name}}"
+              />
+              <span class="trailer-play" aria-hidden="true"
+                ><svg><use href="#icon-play" /></svg
+              ></span>
+              <span class="trailer-caption" aria-hidden="true">Dar o play</span>
+            </a>
+          </div>
+        </div>
+      </section>
+
+      <section
+        class="instagram-section container"
+        id="instagram"
+        aria-labelledby="instagram-title"
+      >
+        <div class="instagram-copy">
+          <h2 id="instagram-title">Pelo Instagram<span class="red-period">.</span></h2>
+          <p>Bastidores, avisos e novidades do {{handle}}.</p>
+          <a
+            class="instagram-link"
+            data-link="instagram"
+            href="{{instagram}}"
+            target="_blank"
+            rel="noopener noreferrer"
+          >
+            <svg aria-hidden="true"><use href="#icon-instagram" /></svg>
+            Ver no Instagram
+            <svg class="instagram-link-arrow" aria-hidden="true"><use href="#icon-arrow" /></svg>
+          </a>
+        </div>
+        <div class="instagram-embed" data-instagram-embed hidden>
+          <iframe
+            title="Publicações do {{handle}} no Instagram"
+            data-src="{{instagram_embed}}"
+            width="540"
+            height="620"
+            loading="lazy"
+            referrerpolicy="strict-origin-when-cross-origin"
+          ></iframe>
+        </div>
+      </section>
 
       <section
         class="connections container"
@@ -281,7 +379,7 @@
             ><svg aria-hidden="true"><use href="#icon-twitch" /></svg></a>
           </div>
         </div>
-        <div class="discord-line" id="discord-line">
+        <div class="discord-line" id="discord-line" hidden>
           <span class="discord-label"
             ><svg aria-hidden="true"><use href="#icon-discord" /></svg
             ><strong>Discord</strong></span
@@ -290,72 +388,6 @@
             >Ainda estou montando um canto pra comunidade.</span
           >
           <span class="discord-status" id="discord-status">Em breve</span>
-        </div>
-      </section>
-
-      <section
-        class="spotlight"
-        id="apresentacao"
-        aria-labelledby="spotlight-title"
-      >
-        <div class="container spotlight-layout">
-          <div class="spotlight-copy">
-            <div class="spotlight-art-line" aria-hidden="true"></div>
-            <h2 id="spotlight-title">
-              Chegou agora<span class="red-period">?</span>
-            </h2>
-            <p>{{creator_description}}</p>
-            <p>Gravei um vídeo curto pra me apresentar. Dá o play aí.</p>
-          </div>
-          <div class="spotlight-video" id="trailer-frame">
-            <a
-              id="play-trailer"
-              class="trailer-trigger"
-              data-link="trailer"
-              href="{{trailer}}"
-              target="_blank"
-              rel="noopener noreferrer"
-              aria-label="Assistir à apresentação do {{brand_name}}"
-            >
-              <img
-                src="assets/boas-vindas.webp"
-                width="1120"
-                height="630"
-                loading="lazy"
-                alt="Thumbnail do vídeo Bem-vindo ao {{brand_name}}"
-              />
-              <span class="trailer-play" aria-hidden="true"
-                ><svg><use href="#icon-play" /></svg
-              ></span>
-              <span class="trailer-caption" aria-hidden="true">Dar o play</span>
-            </a>
-          </div>
-        </div>
-      </section>
-
-      <section
-        class="latest container"
-        id="videos"
-        aria-labelledby="latest-title"
-      >
-        <div class="latest-top">
-          <div class="latest-title-group">
-            <h2 id="latest-title">Últimos vídeos</h2>
-            <p>Vídeos e lives que rolaram no canal.</p>
-          </div>
-          <a
-            class="see-all"
-            data-link="youtube"
-            href="{{youtube}}"
-            target="_blank"
-            rel="noopener noreferrer"
-            ><svg aria-hidden="true"><use href="#icon-youtube" /></svg> Acessar
-            canal</a
-          >
-        </div>
-        <div id="videos-list" class="videos-grid" aria-live="polite">
-          <!-- site:videos:start -->
-          <!-- site:videos:end -->
         </div>
       </section>
     </main>
@@ -377,6 +409,7 @@
       <svg aria-hidden="true"><use href="#icon-arrow-up" /></svg>
     </a>
     <script src="navigation.js"></script>
+    <script src="instagram.js" defer></script>
     <script src="config.js"></script>
     <script src="script.js"></script>
   </body>

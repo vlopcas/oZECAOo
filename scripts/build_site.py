@@ -20,7 +20,7 @@ from zoneinfo import ZoneInfo
 
 VIDEO_ID = re.compile(r"[A-Za-z0-9_-]{11}\Z")
 BUILD_MARKER = ".site-build"
-STATIC_FILES = ("styles.css", "navigation.js", "script.js", "favicon.ico", ".nojekyll")
+STATIC_FILES = ("styles.css", "navigation.js", "instagram.js", "script.js", "favicon.ico", ".nojekyll")
 BUILD_ENTRIES = {*STATIC_FILES, "index.html", "config.js", "site.webmanifest", "robots.txt", "sitemap.xml", "assets", "data", BUILD_MARKER, "favicon.svg"}
 
 
@@ -70,6 +70,14 @@ def asset_path(value, name: str) -> str:
     if parsed.scheme or parsed.netloc or parsed.query or parsed.fragment or parsed.path.startswith("/") or ".." in parts or not parts or parts[0] != "assets":
         raise BuildError(f"O caminho deve ficar dentro de assets/: {name}")
     return value
+
+
+def instagram_embed_url(profile: str) -> str:
+    parsed = urlsplit(https_url(profile, "instagram"))
+    username = parsed.path.strip("/")
+    if parsed.hostname not in ("instagram.com", "www.instagram.com") or parsed.port or parsed.query or parsed.fragment or not re.fullmatch(r"[A-Za-z0-9._]{1,30}", username):
+        raise BuildError("instagram deve ser a URL de um perfil oficial do Instagram, sem consulta ou fragmento.")
+    return f"https://www.instagram.com/{username}/embed/"
 
 
 def normalized_videos(items, limit: int) -> list[dict]:
@@ -126,6 +134,7 @@ def load_config(path: Path) -> dict:
         raise BuildError("themeColor deve ser uma cor hexadecimal de seis dígitos.")
     for key in ("youtube", "instagram", "twitch", "trailer"):
         https_url(cfg.get(key), key)
+    instagram_embed_url(cfg["instagram"])
     if cfg.get("discord"):
         https_url(cfg["discord"], "discord")
     if not isinstance(cfg.get("trailerVideoId"), str) or not VIDEO_ID.fullmatch(cfg["trailerVideoId"]):
@@ -250,6 +259,7 @@ def render_index(template: str, cfg: dict, videos: list[dict]) -> str:
     template = replace_block(template, "seo", seo_markup(cfg))
     template = replace_block(template, "videos", video_markup(videos, cfg))
     values = {"site_name": cfg["siteName"], "creator_name": cfg["creator"]["name"], "brand_name": cfg["creator"]["brandName"], "handle": cfg["creator"]["handle"], "hero_description": cfg["creator"]["heroDescription"], "creator_description": cfg["creator"]["description"], "creator_image": cfg["creator"]["image"], "language": cfg["language"], "youtube_videos": cfg["youtube"].rstrip("/") + "/videos", **{key: cfg[key] for key in ("youtube", "instagram", "twitch", "trailer")}}
+    values["instagram_embed"] = instagram_embed_url(cfg["instagram"])
     for key, value in values.items():
         template = template.replace("{{" + key + "}}", html.escape(value, quote=True))
     unresolved = re.findall(r"\{\{[a-zA-Z_][a-zA-Z_0-9]*\}\}", template)

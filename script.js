@@ -12,10 +12,13 @@
   // Discord ganha um link próprio quando for configurado, sem mudar o HTML manualmente.
   if(validUrl(cfg.discord)){
     const line=document.querySelector('#discord-line');
-    const a=document.createElement('a');a.href=cfg.discord;a.target='_blank';a.rel='noopener noreferrer';
-    a.className='discord-visit';a.textContent='Entrar na comunidade';
-    const status=line.querySelector('#discord-status');status.replaceWith(a);
-    const desc=line.querySelector('.discord-description');desc.textContent='O espaço da comunidade ZECAO.';
+    if(line){
+      const a=document.createElement('a');a.href=cfg.discord;a.target='_blank';a.rel='noopener noreferrer';
+      a.className='discord-visit';a.textContent='Entrar na comunidade';
+      const status=line.querySelector('#discord-status');status.replaceWith(a);
+      const desc=line.querySelector('.discord-description');desc.textContent='O espaço da comunidade ZECAO.';
+      line.hidden=false;
+    }
   }
   const button=document.getElementById('play-trailer');
   button?.addEventListener('click',event=>{
