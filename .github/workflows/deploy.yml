@@ -26,13 +26,12 @@ jobs:
     steps:
       - name: Baixar repositório
         uses: actions/checkout@v7
+      - name: Validar geração e reservas do site
+        run: python3 -m unittest discover -s tests -v
       - name: Consultar vídeos públicos do YouTube
         run: python3 scripts/update_videos.py
       - name: Montar site estático
-        run: |
-          mkdir -p dist
-          cp index.html styles.css config.js navigation.js script.js favicon.ico site.webmanifest .nojekyll dist/
-          cp -R assets data dist/
+        run: python3 scripts/build_site.py --feed dist/data/videos.json
       - name: Preparar GitHub Pages
         uses: actions/configure-pages@v6
       - name: Empacotar arquivos estáticos

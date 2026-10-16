@@ -56,14 +56,19 @@
   }
   function showVideos(items){
     if(!Array.isArray(items))return;
-    const filtered=items.filter(v=>v&&validId(v.id)&&v.id!==cfg.trailerVideoId).slice(0,4);
+    const seen=new Set();
+    const limit=Number.isInteger(cfg.maxVisibleVideos)&&cfg.maxVisibleVideos>0?cfg.maxVisibleVideos:4;
+    const filtered=items.filter(v=>{
+      if(!v||!validId(v.id)||v.id===cfg.trailerVideoId||seen.has(v.id))return false;
+      seen.add(v.id);return true;
+    }).slice(0,limit);
     if(!filtered.length)return;
     grid.replaceChildren();
     for(const v of filtered){
-      const link=node('a','video-tile');link.href='https://www.youtube.com/watch?v='+v.id;link.target='_blank';link.rel='noopener noreferrer';
+      const link=node('a','video-tile');link.dataset.videoId=v.id;link.href='https://www.youtube.com/watch?v='+v.id;link.target='_blank';link.rel='noopener noreferrer';
       const title=String(v.title||'Vídeo no ZECAO');link.setAttribute('aria-label','Assistir no YouTube: '+title);
       const media=node('div','video-photo');const img=node('img');
-      img.alt='Capa do vídeo '+title;img.loading='lazy';img.decoding='async';
+      img.dataset.videoId=v.id;img.alt='Capa do vídeo '+title;img.loading='lazy';img.decoding='async';
       img.width=1280;img.height=720;
       loadThumbnail(img,v);
       const play=node('span','video-play');play.append(svgRef('icon-play'));media.append(img,play);
@@ -75,7 +80,15 @@
       link.append(media,details);grid.append(link);
     }
   }
-  showVideos(cfg.fallbackVideos||[]);
+  // Os cards gerados no build já contêm o feed atual, inclusive sem JavaScript.
+  const initialImages=grid.querySelectorAll('img[data-video-id]');
+  if(initialImages.length){
+    initialImages.forEach(img=>{
+      if(validId(img.dataset.videoId))loadThumbnail(img,{id:img.dataset.videoId,thumbnail:img.dataset.thumbnail||img.getAttribute('src')});
+    });
+  }else{
+    showVideos(cfg.fallbackVideos||[]);
+  }
   if(/^https?:$/.test(location.protocol)){
     const feed=cfg.videosFeedPath||'data/videos.json';
     fetch(feed+'?v='+Math.floor(Date.now()/1800000),{cache:'no-store'})

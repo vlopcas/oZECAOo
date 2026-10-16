@@ -36,5 +36,7 @@
   .menu-open .menu-toggle-bars::before{transform:translateY(6px) rotate(45deg)}
   .menu-open .menu-toggle-bars::after{transform:translateY(-6px) rotate(-45deg)}
 }
+.hello h1 .hello-kicker{display:block;font-size:13px;line-height:1.6;font-weight:700;letter-spacing:.01em;color:#f16475}
+@media(max-width:720px){.hello h1 .hello-kicker{font-size:12px;margin-bottom:8px}}
 .trailer-trigger:focus-visible{outline-offset:-5px}
 @media(prefers-reduced-motion:reduce){html{scroll-behavior:auto}*,*::before,*::after{transition:none!important;animation:none!important}}

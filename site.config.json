@@ -1,0 +1,49 @@
+{
+  "siteUrl": "https://ozecaoo.com/",
+  "siteName": "oZECAOo",
+  "siteTitle": "oZECAOo | Jogos, gameplays e lives",
+  "siteDescription": "Site oficial do ZECAO (@ozecaoo): vídeos, séries de gameplay e lives no YouTube, bastidores no Instagram e transmissões ocasionais na Twitch.",
+  "language": "pt-BR",
+  "locale": "pt_BR",
+  "themeColor": "#0b0b0e",
+  "creator": {
+    "name": "Zecão",
+    "brandName": "ZECAO",
+    "handle": "@ozecaoo",
+    "alternateNames": ["ZECAO", "oZECAOo", "@ozecaoo"],
+    "description": "Sou o Zecão (@ozecaoo), criador de vídeos, séries de gameplay e lives de jogos. O YouTube é meu canal principal; no Instagram compartilho bastidores e novidades, e na Twitch faço transmissões ocasionais.",
+    "heroDescription": "Faço vídeos, séries de gameplay, desafios e lives de jogos. A maior parte acontece no YouTube. Chega aí!",
+    "image": "assets/avatar.webp"
+  },
+  "socialImage": {
+    "path": "assets/social-preview-v1.jpg",
+    "type": "image/jpeg",
+    "width": 1200,
+    "height": 630,
+    "alt": "Avatar ilustrado do Zecão com headset e microfone vermelho, ao lado da logo ZECAO sobre montanhas escuras."
+  },
+  "youtube": "https://www.youtube.com/channel/UCkS1cj-1C9ahgYVvFGz86qw",
+  "youtubeChannelId": "UCkS1cj-1C9ahgYVvFGz86qw",
+  "twitch": "https://www.twitch.tv/ozecaoo",
+  "instagram": "https://www.instagram.com/ozecaoo/",
+  "discord": "",
+  "trailer": "https://youtu.be/ItDJkbW2M4A",
+  "trailerVideoId": "ItDJkbW2M4A",
+  "videosFeedPath": "data/videos.json",
+  "maxFeedVideos": 8,
+  "maxVisibleVideos": 4,
+  "fallbackVideos": [
+    {
+      "id": "EpEauQtpjZ4",
+      "title": "Jogando ARC Raiders pela primeira vez",
+      "type": "LIVE GRAVADA",
+      "published": "2026-10-10T19:01:28Z"
+    },
+    {
+      "id": "l3k6mkxiYPI",
+      "title": "Borderlands 3 — DLCs ao vivo",
+      "type": "LIVE GRAVADA",
+      "published": "2026-10-04T18:23:59Z"
+    }
+  ]
+}

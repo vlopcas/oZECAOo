@@ -1,36 +1,10 @@
 <!doctype html>
-<html lang="pt-BR">
+<html lang="{{language}}">
   <head>
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1" />
-    <meta name="theme-color" content="#0b0b0e" />
-    <meta name="color-scheme" content="dark" />
-    <meta
-      name="description"
-      content="oZECAOo. Jogos, vídeos, séries de gameplay e lives no YouTube; bastidores no Instagram e transmissões ocasionais na Twitch."
-    />
-    <meta name="application-name" content="oZECAOo" />
-    <meta property="og:type" content="website" />
-    <meta property="og:site_name" content="oZECAOo" />
-    <meta property="og:url" content="https://vlopcas.github.io/oZECAOo/" />
-    <meta property="og:locale" content="pt_BR" />
-    <meta property="og:title" content="oZECAOo - Jogos, Lives e etc" />
-    <meta
-      property="og:description"
-      content="Vídeos, séries e lives no YouTube, novidades no Instagram e um pouco de Twitch de vez em quando."
-    />
-    <meta
-      property="og:image"
-      content="https://vlopcas.github.io/oZECAOo/assets/social-preview-v1.jpg"
-    />
-    <meta property="og:image:type" content="image/jpeg" />
-    <meta property="og:image:width" content="1200" />
-    <meta property="og:image:height" content="630" />
-    <meta
-      property="og:image:alt"
-      content="Avatar ilustrado do Zecão com headset e microfone vermelho, ao lado da logo ZECAO sobre montanhas escuras."
-    />
-    <title>oZECAOo - Jogos, Lives e etc</title>
+    <!-- site:seo:start -->
+    <!-- site:seo:end -->
     <link
       rel="icon"
       type="image/x-icon"
@@ -176,10 +150,10 @@
         <a
           class="wordmark"
           href="#inicio"
-          aria-label="ZECAO — voltar ao início"
+          aria-label="{{brand_name}} — voltar ao início"
         >
           <img src="assets/z-brand.webp" alt="" width="38" height="38" />
-          <span>ZECAO<small>@ozecaoo</small></span>
+          <span>{{brand_name}}<small>{{handle}}</small></span>
         </a>
         <button
           class="menu-toggle"
@@ -199,7 +173,7 @@
           <a
             class="header-out"
             data-link="youtube"
-            href="https://www.youtube.com/channel/UCkS1cj-1C9ahgYVvFGz86qw"
+            href="{{youtube}}"
             target="_blank"
             rel="noopener noreferrer"
           >
@@ -214,32 +188,31 @@
       <div class="container">
         <section
           class="masthead"
-          aria-label="Banner ZECAO — paisagem de montanhas escuras e céu vermelho"
+          aria-label="Banner {{brand_name}} — paisagem de montanhas escuras e céu vermelho"
         >
           <div
             class="masthead-image"
             role="img"
-            aria-label="Logo ZECAO ao centro de uma paisagem de montanhas e céu vermelho"
+            aria-label="Logo {{brand_name}} ao centro de uma paisagem de montanhas e céu vermelho"
           ></div>
         </section>
 
         <section class="hello" aria-labelledby="hello-title">
           <div class="hello-face">
             <img
-              src="assets/avatar.webp"
+              src="{{creator_image}}"
               width="124"
               height="124"
-              alt="Ilustração do Zecão com headset e microfone"
+              alt="Ilustração do {{creator_name}} com headset e microfone"
             />
           </div>
           <div class="hello-main">
-            <p class="hello-kicker">Eu sou o Zecão.</p>
-            <h1 id="hello-title">E aí, beleza<span>?</span></h1>
+            <h1 id="hello-title">
+              <span class="hello-kicker">Eu sou o {{creator_name}}.</span>
+              E aí, beleza<span>?</span>
+            </h1>
           </div>
-          <p class="hello-description">
-            Vídeos, séries, lives, desafios e umas descobertas pelo caminho. A
-            maior parte acontece no YouTube. Chega aí!
-          </p>
+          <p class="hello-description">{{hero_description}}</p>
         </section>
       </div>
 
@@ -257,11 +230,11 @@
             também.
           </p>
         </div>
-        <div class="links-list" aria-label="Redes do ZECAO">
+        <div class="links-list" aria-label="Redes do {{brand_name}}">
           <a
             class="link-row link-row--youtube"
             data-link="youtube"
-            href="https://www.youtube.com/channel/UCkS1cj-1C9ahgYVvFGz86qw"
+            href="{{youtube}}"
             target="_blank"
             rel="noopener noreferrer"
           >
@@ -280,7 +253,7 @@
           <a
             class="link-row link-row--instagram"
             data-link="instagram"
-            href="https://www.instagram.com/ozecaoo/"
+            href="{{instagram}}"
             target="_blank"
             rel="noopener noreferrer"
           >
@@ -297,7 +270,7 @@
           <a
             class="link-row link-row--twitch"
             data-link="twitch"
-            href="https://www.twitch.tv/ozecaoo"
+            href="{{twitch}}"
             target="_blank"
             rel="noopener noreferrer"
           >
@@ -337,14 +310,12 @@
             <h2 id="spotlight-title">
               Chegou agora<span class="red-period">?</span>
             </h2>
-            <p>
-              Gravei um vídeo curto pra me apresentar e contar o que pretendo
-              trazer pro canal. Dá o play aí.
-            </p>
+            <p>{{creator_description}}</p>
+            <p>Gravei um vídeo curto pra me apresentar. Dá o play aí.</p>
             <a
               class="text-link"
               data-link="trailer"
-              href="https://youtu.be/ItDJkbW2M4A"
+              href="{{trailer}}"
               target="_blank"
               rel="noopener noreferrer"
               ><svg aria-hidden="true"><use href="#icon-youtube" /></svg>Ou veja
@@ -356,14 +327,14 @@
               id="play-trailer"
               type="button"
               class="trailer-trigger"
-              aria-label="Reproduzir a apresentação do ZECAO"
+              aria-label="Reproduzir a apresentação do {{brand_name}}"
             >
               <img
                 src="assets/boas-vindas.webp"
                 width="1120"
                 height="630"
                 loading="lazy"
-                alt="Thumbnail do vídeo Bem-vindo ao ZECAO"
+                alt="Thumbnail do vídeo Bem-vindo ao {{brand_name}}"
               />
               <span class="trailer-play"
                 ><svg aria-hidden="true"><use href="#icon-play" /></svg
@@ -386,7 +357,7 @@
           <a
             class="see-all"
             data-link="youtubeVideos"
-            href="https://www.youtube.com/channel/UCkS1cj-1C9ahgYVvFGz86qw/videos"
+            href="{{youtube_videos}}"
             target="_blank"
             rel="noopener noreferrer"
             ><svg aria-hidden="true"><use href="#icon-youtube" /></svg> Ver tudo
@@ -394,54 +365,8 @@
           >
         </div>
         <div id="videos-list" class="videos-grid" aria-live="polite">
-          <a
-            class="video-tile"
-            href="https://www.youtube.com/watch?v=EpEauQtpjZ4"
-            target="_blank"
-            rel="noopener noreferrer"
-          >
-            <div class="video-photo">
-              <img
-                src="https://i.ytimg.com/vi/EpEauQtpjZ4/hqdefault.jpg"
-                loading="lazy"
-                alt="Capa do vídeo ARC Raiders"
-                onerror="
-                  this.onerror = null;
-                  this.src = 'assets/hero.webp';
-                "
-              /><span class="video-play"
-                ><svg><use href="#icon-play" /></svg
-              ></span>
-            </div>
-            <div class="video-details">
-              <span class="video-date">10/10/2026</span>
-              <h3>Jogando ARC Raiders pela primeira vez</h3>
-            </div>
-          </a>
-          <a
-            class="video-tile"
-            href="https://www.youtube.com/watch?v=l3k6mkxiYPI"
-            target="_blank"
-            rel="noopener noreferrer"
-          >
-            <div class="video-photo">
-              <img
-                src="https://i.ytimg.com/vi/l3k6mkxiYPI/hqdefault.jpg"
-                loading="lazy"
-                alt="Capa do vídeo Borderlands 3"
-                onerror="
-                  this.onerror = null;
-                  this.src = 'assets/wallpaper-wide.webp';
-                "
-              /><span class="video-play"
-                ><svg><use href="#icon-play" /></svg
-              ></span>
-            </div>
-            <div class="video-details">
-              <span class="video-date">04/10/2026</span>
-              <h3>Borderlands 3 — DLCs ao vivo</h3>
-            </div>
-          </a>
+          <!-- site:videos:start -->
+          <!-- site:videos:end -->
         </div>
       </section>
     </main>
@@ -455,8 +380,8 @@
       </div>
       <div class="container footer-bottom">
         <span class="footer-sign"
-          >ZECAO <span class="footer-handle">@ozecaoo</span></span
-        ><span>© <span id="year">2026</span> ZECAO</span
+          >{{brand_name}} <span class="footer-handle">{{handle}}</span></span
+        ><span>© <span id="year">2026</span> {{brand_name}}</span
         ><a href="#inicio"
           >Voltar ao início <span aria-hidden="true">↑</span></a
         >
