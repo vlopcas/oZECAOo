@@ -264,6 +264,7 @@
             <h2 id="spotlight-title">
               Chegou agora<span class="red-period">?</span>
             </h2>
+            <p>{{creator_description}}</p>
             <p>Gravei esse vídeo pra apresentar o canal. Dá o play aí.</p>
           </div>
           <div class="spotlight-video" id="trailer-frame">
@@ -298,19 +299,58 @@
         aria-labelledby="instagram-title"
       >
         <div class="instagram-copy">
-          <h2 id="instagram-title">Pelo Instagram<span class="red-period">.</span></h2>
-          <p>Bastidores, avisos e novidades do {{handle}}.</p>
-          <a
-            class="instagram-link"
-            data-link="instagram"
-            href="{{instagram}}"
-            target="_blank"
-            rel="noopener noreferrer"
+          <div class="instagram-intro">
+            <h2 id="instagram-title">Pelo Instagram<span class="red-period">.</span></h2>
+            <p>Bastidores, avisos e novidades do {{handle}}.</p>
+            <a
+              class="see-all instagram-link"
+              data-link="instagram"
+              href="{{instagram}}"
+              target="_blank"
+              rel="noopener noreferrer"
+            >
+              <svg aria-hidden="true"><use href="#icon-instagram" /></svg>
+              Ver no Instagram
+            </a>
+          </div>
+          <svg
+            class="instagram-art"
+            viewBox="0 0 392 232"
+            fill="none"
+            aria-hidden="true"
+            focusable="false"
           >
-            <svg aria-hidden="true"><use href="#icon-instagram" /></svg>
-            Ver no Instagram
-            <svg class="instagram-link-arrow" aria-hidden="true"><use href="#icon-arrow" /></svg>
-          </a>
+            <defs>
+              <linearGradient id="instagram-sky" x1="198" y1="54" x2="198" y2="169" gradientUnits="userSpaceOnUse">
+                <stop stop-color="#5d1825" />
+                <stop offset="1" stop-color="#171318" />
+              </linearGradient>
+              <clipPath id="instagram-scene">
+                <path d="M76 52H340V178H76z" />
+              </clipPath>
+            </defs>
+            <path d="M20 62V30H52M340 204H372V172" stroke="#71313e" stroke-width="2" />
+            <path d="M36 16H66M356 218H326" stroke="#eb263a" stroke-width="3" />
+            <g transform="rotate(-9 186 119)">
+              <path d="M42 39H307V195H42z" fill="#121014" stroke="#453039" />
+              <path d="M56 53H293V181H56z" stroke="#2f232a" />
+            </g>
+            <path d="M65 41H351V201H65z" fill="#141115" stroke="#76505b" />
+            <g clip-path="url(#instagram-scene)">
+              <path d="M76 52H340V178H76z" fill="url(#instagram-sky)" />
+              <path d="m76 97 45-12 37 10 28-15 43 5 31-17 38 13 42-14" stroke="#ee354b" stroke-opacity=".65" stroke-width="3" />
+              <path d="m58 156 65-83 44 51 58-69 51 65 30-27 53 67v31H58z" fill="#242027" stroke="#71545e" stroke-width="1.5" stroke-linejoin="round" />
+              <path d="m99 104 24-31 22 25-21-9-13 17zm95-12 31-37 32 41-25-17-12 7-5-8z" fill="#b9a9af" fill-opacity=".68" />
+              <path d="m58 170 55-48 28 32 39-39 49 44 35-28 42 30 30-29 32 41v23H58z" fill="#100e12" stroke="#4d343f" stroke-width="1.5" />
+              <path d="m133 178 47-22 46 10 42-6 34 18" fill="#792333" />
+              <path d="m167 173 26-8 31 6m-46 5 59 2" stroke="#ef3c51" stroke-width="2" />
+              <path d="M89 65H107M89 65V83M327 165H309M327 165V147" stroke="#d7bdc6" stroke-opacity=".75" />
+              <circle cx="318" cy="72" r="4" fill="#ff4359" />
+            </g>
+            <path d="M76 188H103" stroke="#eb263a" stroke-width="2" />
+            <path d="M110 188H132M138 188H150" stroke="#53343f" stroke-width="2" />
+            <circle cx="335" cy="188" r="2" fill="#925262" />
+          </svg>
         </div>
         <div class="instagram-embed" data-instagram-embed hidden>
           <iframe

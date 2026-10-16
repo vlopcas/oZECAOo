@@ -41,11 +41,15 @@ A consulta ao YouTube gera `dist/data/videos.json`. Os arquivos gerados em `dist
 
 O layout usa CSS e SVG inline, sem bibliotecas, fontes externas ou analytics próprios. O player de `youtube-nocookie.com` só é criado após um clique.
 
-A página segue a ordem: saudação → últimos vídeos → apresentação → Instagram → redes. Vídeos têm maior destaque; apresentação e redes usam títulos e espaçamentos mais contidos. A navbar acompanha a rolagem, indica a seção atual e mantém os destinos abaixo dela ao navegar pelas âncoras. O botão circular de retorno aparece após 400 px ou 75% da altura da tela, o que for maior. Nas redes, os ícones são os links, com alvos de toque e nomes acessíveis; o Discord permanece oculto enquanto a URL estiver vazia. A apresentação mantém o play visível no canto inferior esquerdo; sem JavaScript, a própria capa abre o vídeo no YouTube.
+A página segue a ordem: saudação → últimos vídeos → apresentação → Instagram → redes. Vídeos têm maior destaque; apresentação e redes usam títulos e espaçamentos mais contidos. A apresentação explica quem é o Zecão, o conteúdo criado e o papel dos três canais, usando `creator.description` também no HTML visível, coerente com os dados estruturados. A navbar acompanha a rolagem, indica a seção atual e mantém os destinos abaixo dela ao navegar pelas âncoras. O botão circular de retorno aparece após 400 px ou 75% da altura da tela, o que for maior. Nas redes, os ícones são os links, com alvos de toque e nomes acessíveis; o Discord permanece oculto enquanto a URL estiver vazia. A apresentação mantém o play visível no canto inferior esquerdo; sem JavaScript, a própria capa abre o vídeo no YouTube.
+
+O build acrescenta uma versão baseada no conteúdo às URLs de CSS e scripts no HTML publicado. Quando um desses arquivos muda, o navegador recebe uma URL nova, evitando combinar HTML atualizado com estilos ou scripts antigos em cache. Arquivos idênticos mantêm suas versões entre builds; as fontes não recebem os parâmetros de versão.
 
 ## Prévia do Instagram
 
 A seção usa a incorporação oficial do **perfil**, derivada do link `instagram` de `site.config.json`. As publicações são servidas pelo próprio Instagram, sem cadastrar posts manualmente, consultar uma API autenticada ou manter tokens. O visual interno e a atualização/cache são controlados pelo Instagram; a quantidade de posts não é um contrato do site.
+
+O título e o acesso ao perfil seguem a tipografia e o estilo de links das demais seções. Uma ilustração SVG decorativa com molduras e montanhas nas cores da marca equilibra a coluna de texto no desktop e usa uma versão compacta no celular. O conteúdo interno da incorporação mantém a aparência oficial do Instagram.
 
 O iframe só recebe seu endereço quando a seção chega a 320 px da área visível. A altura acompanha as mensagens oficiais `MEASURE`, aceitas apenas da origem HTTPS do Instagram e da janela daquele iframe, com limites para valores inválidos. A altura inicial reserva espaço antes do carregamento; a rolagem nativa do iframe fica disponível caso o serviço mude seu comportamento. O site não carrega o SDK de embeds separadamente.
 

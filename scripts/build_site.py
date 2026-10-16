@@ -5,6 +5,7 @@ from __future__ import annotations
 
 import argparse
 from datetime import datetime, timezone
+import hashlib
 import html
 from html.parser import HTMLParser
 import json
@@ -21,6 +22,7 @@ from zoneinfo import ZoneInfo
 VIDEO_ID = re.compile(r"[A-Za-z0-9_-]{11}\Z")
 BUILD_MARKER = ".site-build"
 STATIC_FILES = ("styles.css", "navigation.js", "instagram.js", "script.js", "favicon.ico", ".nojekyll")
+VERSIONED_FILES = ("styles.css", "navigation.js", "instagram.js", "config.js", "script.js")
 BUILD_ENTRIES = {*STATIC_FILES, "index.html", "config.js", "site.webmanifest", "robots.txt", "sitemap.xml", "assets", "data", BUILD_MARKER, "favicon.svg"}
 
 
@@ -272,6 +274,18 @@ def webmanifest(cfg: dict) -> dict:
     return {"id": "./", "name": cfg["siteTitle"], "short_name": cfg["siteName"], "lang": cfg["language"], "start_url": "./", "scope": "./", "display": "browser", "theme_color": cfg["themeColor"], "background_color": cfg["themeColor"], "icons": [{"src": f"assets/icons/icon-{size}x{size}.png", "sizes": f"{size}x{size}", "type": "image/png", "purpose": "any"} for size in (192, 512)]}
 
 
+def version_assets(page: str, output: Path) -> str:
+    # Keep readable filenames, but give changed CSS/JS a new URL in browser caches.
+    versions = {name: hashlib.sha256((output / name).read_bytes()).hexdigest()[:12] for name in VERSIONED_FILES}
+    filenames = "|".join(re.escape(name) for name in VERSIONED_FILES)
+    attribute = re.compile(rf'''(?P<prefix>\b(?i:href|src)\s*=\s*)(?P<quote>["'])(?P<name>{filenames})(?P=quote)''')
+
+    def version_tag(match):
+        return attribute.sub(lambda attr: f"{attr['prefix']}{attr['quote']}{attr['name']}?v={versions[attr['name']]}{attr['quote']}", match.group(0))
+
+    return re.sub(r"<(?:link|script)\b[^>]*>", version_tag, page, flags=re.IGNORECASE)
+
+
 class ReferenceParser(HTMLParser):
     def __init__(self):
         super().__init__()
@@ -341,10 +355,10 @@ def build_site(root: Path, output: Path | None = None, config_path: Path | None 
                 shutil.copytree(root / name, staged / name)
         except OSError as exc:
             raise BuildError(f"Não foi possível copiar um arquivo público: {exc}") from exc
-        (staged / "index.html").write_text(rendered, encoding="utf-8")
         runtime = {key: cfg[key] for key in ("youtube", "twitch", "instagram", "trailer", "trailerVideoId", "videosFeedPath", "fallbackVideos", "maxVisibleVideos")}
         runtime["discord"] = cfg.get("discord", "")
         (staged / "config.js").write_text("/* Gerado de site.config.json; não editar. */\nwindow.ZECAO_CONFIG = " + script_json(runtime).rstrip() + ";\n", encoding="utf-8")
+        (staged / "index.html").write_text(version_assets(rendered, staged), encoding="utf-8")
         (staged / "site.webmanifest").write_text(json_text(webmanifest(cfg)), encoding="utf-8")
         (staged / cfg["videosFeedPath"]).write_text(json_text(feed), encoding="utf-8")
         robots = "\n\n".join(f"User-agent: {agent}\nAllow: /" for agent in ("*", "Googlebot", "OAI-SearchBot", "GPTBot", "Google-Extended"))

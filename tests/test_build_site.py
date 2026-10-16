@@ -1,6 +1,7 @@
 """Behavioral coverage for the static build and its failure boundaries."""
 
 import copy
+import hashlib
 import importlib.util
 import json
 from pathlib import Path
@@ -8,6 +9,7 @@ import re
 import tempfile
 import unittest
 from xml.etree import ElementTree
+from urllib.parse import parse_qs, urlsplit
 
 
 SCRIPT = Path(__file__).resolve().parents[1] / "scripts" / "build_site.py"
@@ -70,6 +72,11 @@ class BuildSiteTests(unittest.TestCase):
 
     def read_html(self):
         return (self.root / "dist" / "index.html").read_text(encoding="utf-8")
+
+    def asset_versions(self):
+        parser = builder.ReferenceParser()
+        parser.feed(self.read_html())
+        return {urlsplit(reference).path: parse_qs(urlsplit(reference).query)["v"][0] for reference in parser.references if urlsplit(reference).path in builder.VERSIONED_FILES}
 
     def test_static_page_has_identity_cards_seo_and_all_public_dependencies(self):
         before = self.tree(self.root)
@@ -163,6 +170,43 @@ class BuildSiteTests(unittest.TestCase):
         self.build()
         self.assertEqual(first, self.tree(output))
         self.assertNotIn("lastmod", (output / "sitemap.xml").read_text())
+
+    def test_css_and_scripts_use_content_versions_without_renaming_assets(self):
+        output = self.build()
+        versions = self.asset_versions()
+        self.assertEqual(set(versions), set(builder.VERSIONED_FILES))
+        for filename, version in versions.items():
+            with self.subTest(filename=filename):
+                self.assertEqual(version, hashlib.sha256((output / filename).read_bytes()).hexdigest()[:12])
+                self.assertRegex(version, r"^[a-f0-9]{12}$")
+        self.assertIn('href="favicon.ico"', self.read_html())
+        self.assertIn('href="site.webmanifest"', self.read_html())
+        self.assertIn('src="assets/avatar.webp"', self.read_html())
+        # Source markup stays useful for editing and never receives build hashes.
+        self.assertIn('href="styles.css"', (self.root / "index.html").read_text())
+
+    def test_css_change_updates_its_version_without_invalidating_scripts(self):
+        self.build()
+        previous = self.asset_versions()
+        (self.root / "styles.css").write_text(".instagram-section{display:grid}", encoding="utf-8")
+        self.build()
+        current = self.asset_versions()
+        self.assertNotEqual(previous.pop("styles.css"), current.pop("styles.css"))
+        self.assertEqual(previous, current)
+
+    def test_runtime_config_changes_invalidate_config_script_only(self):
+        self.build()
+        previous = self.asset_versions()
+        changes = (("maxVisibleVideos", 3), ("fallbackVideos", [{**self.config["fallbackVideos"][0], "title": "Reserva atualizada"}]))
+        for key, value in changes:
+            with self.subTest(key=key):
+                self.config[key] = value
+                self.write_config()
+                self.build()
+                current = self.asset_versions()
+                self.assertNotEqual(previous["config.js"], current["config.js"])
+                self.assertEqual({name: version for name, version in previous.items() if name != "config.js"}, {name: version for name, version in current.items() if name != "config.js"})
+                previous = current
 
     def test_refreshed_feed_can_be_read_from_dist_before_replacement(self):
         feed_path = self.root / "dist" / "data" / "videos.json"
