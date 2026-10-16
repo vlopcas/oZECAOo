@@ -1,0 +1,5 @@
+# Arquivo original de entrega e artefatos gerados localmente.
+*.zip
+dist/
+__pycache__/
+*.py[cod]

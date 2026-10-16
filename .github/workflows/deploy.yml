@@ -1,0 +1,45 @@
+name: ZECAO • Atualização do YouTube e publicação
+
+on:
+  push:
+    branches: [main]
+  schedule:
+    # 4 vezes ao dia; horários em UTC. Execuções agendadas podem atrasar.
+    - cron: '17 1,7,13,19 * * *'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  pages: write
+  id-token: write
+
+concurrency:
+  group: pages
+  cancel-in-progress: false
+
+jobs:
+  site:
+    runs-on: ubuntu-latest
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    steps:
+      - name: Baixar repositório
+        uses: actions/checkout@v7
+      - name: Consultar vídeos públicos do YouTube
+        run: python3 scripts/update_videos.py
+      - name: Montar site estático
+        run: |
+          mkdir -p dist
+          cp index.html styles.css config.js navigation.js script.js favicon.ico site.webmanifest .nojekyll dist/
+          cp -R assets data dist/
+      - name: Preparar GitHub Pages
+        uses: actions/configure-pages@v6
+      - name: Empacotar arquivos estáticos
+        uses: actions/upload-pages-artifact@v5
+        with:
+          path: dist
+          include-hidden-files: true
+      - name: Publicar automaticamente
+        id: deployment
+        uses: actions/deploy-pages@v5
