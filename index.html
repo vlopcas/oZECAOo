@@ -38,7 +38,7 @@
     <link rel="preload" as="image" href="assets/hero.webp" />
     <link rel="stylesheet" href="styles.css" />
   </head>
-  <body>
+  <body id="inicio">
     <svg class="symbols" xmlns="http://www.w3.org/2000/svg" aria-hidden="true">
       <symbol id="icon-arrow" viewBox="0 0 24 24">
         <path
@@ -53,6 +53,16 @@
       <symbol id="icon-right" viewBox="0 0 24 24">
         <path
           d="M4 12h16m-6-6 6 6-6 6"
+          fill="none"
+          stroke="currentColor"
+          stroke-width="1.8"
+          stroke-linecap="round"
+          stroke-linejoin="round"
+        />
+      </symbol>
+      <symbol id="icon-arrow-up" viewBox="0 0 24 24">
+        <path
+          d="M12 19V5m-6 6 6-6 6 6"
           fill="none"
           stroke="currentColor"
           stroke-width="1.8"
@@ -145,7 +155,7 @@
       </symbol>
     </svg>
     <div class="progress-line" aria-hidden="true"></div>
-    <header class="site-header" id="inicio">
+    <header class="site-header">
       <div class="container header-inner">
         <a
           class="wordmark"
@@ -225,67 +235,51 @@
           <h2 id="connections-title">
             Me encontra por aí<span class="red-period">.</span>
           </h2>
-          <p>
-            O YouTube é onde mais apareço. Por aqui você encontra o resto
-            também.
-          </p>
+          <p>Cada canto tem uma coisa. Escolhe o seu e chega junto.</p>
         </div>
         <div class="links-list" aria-label="Redes do {{brand_name}}">
-          <a
-            class="link-row link-row--youtube"
-            data-link="youtube"
-            href="{{youtube}}"
-            target="_blank"
-            rel="noopener noreferrer"
-          >
-            <span class="link-platform"
-              ><svg aria-hidden="true"><use href="#icon-youtube" /></svg
-              ><strong>YouTube</strong></span
-            >
-            <span class="link-note"
-              >O canal principal: vídeos, séries e lives.</span
-            >
-            <span class="link-action"
-              ><svg aria-hidden="true"><use href="#icon-play" /></svg
-              ><span>Ir para o canal</span></span
-            >
-          </a>
-          <a
-            class="link-row link-row--instagram"
-            data-link="instagram"
-            href="{{instagram}}"
-            target="_blank"
-            rel="noopener noreferrer"
-          >
-            <span class="link-platform"
-              ><svg aria-hidden="true"><use href="#icon-instagram" /></svg
-              ><strong>Instagram</strong></span
-            >
-            <span class="link-note">Bastidores, avisos e novidades.</span>
-            <span class="link-action"
-              ><svg aria-hidden="true"><use href="#icon-camera" /></svg
-              ><span>Ver perfil</span></span
-            >
-          </a>
-          <a
-            class="link-row link-row--twitch"
-            data-link="twitch"
-            href="{{twitch}}"
-            target="_blank"
-            rel="noopener noreferrer"
-          >
-            <span class="link-platform"
-              ><svg aria-hidden="true"><use href="#icon-twitch" /></svg
-              ><strong>Twitch</strong></span
-            >
-            <span class="link-note"
-              >De vez em quando, também faço live por lá.</span
-            >
-            <span class="link-action"
-              ><svg aria-hidden="true"><use href="#icon-radio" /></svg
-              ><span>Visitar Twitch</span></span
-            >
-          </a>
+          <div class="link-row link-row--youtube">
+            <div class="link-platform">
+              <h3>YouTube <span>canal principal</span></h3>
+              <p class="link-note">Vídeos, séries e lives.</p>
+            </div>
+            <a
+              class="link-action"
+              data-link="youtube"
+              href="{{youtube}}"
+              target="_blank"
+              rel="noopener noreferrer"
+              aria-label="Acessar o canal do {{brand_name}} no YouTube (abre em nova aba)"
+            ><svg aria-hidden="true"><use href="#icon-youtube" /></svg></a>
+          </div>
+          <div class="link-row link-row--instagram">
+            <div class="link-platform">
+              <h3>Instagram</h3>
+              <p class="link-note">Bastidores, avisos e novidades.</p>
+            </div>
+            <a
+              class="link-action"
+              data-link="instagram"
+              href="{{instagram}}"
+              target="_blank"
+              rel="noopener noreferrer"
+              aria-label="Acessar o perfil do {{brand_name}} no Instagram (abre em nova aba)"
+            ><svg aria-hidden="true"><use href="#icon-instagram" /></svg></a>
+          </div>
+          <div class="link-row link-row--twitch">
+            <div class="link-platform">
+              <h3>Twitch</h3>
+              <p class="link-note">Uma live de vez em quando.</p>
+            </div>
+            <a
+              class="link-action"
+              data-link="twitch"
+              href="{{twitch}}"
+              target="_blank"
+              rel="noopener noreferrer"
+              aria-label="Acessar o canal do {{brand_name}} na Twitch (abre em nova aba)"
+            ><svg aria-hidden="true"><use href="#icon-twitch" /></svg></a>
+          </div>
         </div>
         <div class="discord-line" id="discord-line">
           <span class="discord-label"
@@ -312,22 +306,16 @@
             </h2>
             <p>{{creator_description}}</p>
             <p>Gravei um vídeo curto pra me apresentar. Dá o play aí.</p>
+          </div>
+          <div class="spotlight-video" id="trailer-frame">
             <a
-              class="text-link"
+              id="play-trailer"
+              class="trailer-trigger"
               data-link="trailer"
               href="{{trailer}}"
               target="_blank"
               rel="noopener noreferrer"
-              ><svg aria-hidden="true"><use href="#icon-youtube" /></svg>Ou veja
-              direto no YouTube</a
-            >
-          </div>
-          <div class="spotlight-video" id="trailer-frame">
-            <button
-              id="play-trailer"
-              type="button"
-              class="trailer-trigger"
-              aria-label="Reproduzir a apresentação do {{brand_name}}"
+              aria-label="Assistir à apresentação do {{brand_name}}"
             >
               <img
                 src="assets/boas-vindas.webp"
@@ -336,10 +324,11 @@
                 loading="lazy"
                 alt="Thumbnail do vídeo Bem-vindo ao {{brand_name}}"
               />
-              <span class="trailer-play"
-                ><svg aria-hidden="true"><use href="#icon-play" /></svg
+              <span class="trailer-play" aria-hidden="true"
+                ><svg><use href="#icon-play" /></svg
               ></span>
-            </button>
+              <span class="trailer-caption" aria-hidden="true">Dar o play</span>
+            </a>
           </div>
         </div>
       </section>
@@ -356,12 +345,12 @@
           </div>
           <a
             class="see-all"
-            data-link="youtubeVideos"
-            href="{{youtube_videos}}"
+            data-link="youtube"
+            href="{{youtube}}"
             target="_blank"
             rel="noopener noreferrer"
-            ><svg aria-hidden="true"><use href="#icon-youtube" /></svg> Ver tudo
-            no canal</a
+            ><svg aria-hidden="true"><use href="#icon-youtube" /></svg> Acessar
+            canal</a
           >
         </div>
         <div id="videos-list" class="videos-grid" aria-live="polite">
@@ -381,12 +370,12 @@
       <div class="container footer-bottom">
         <span class="footer-sign"
           >{{brand_name}} <span class="footer-handle">{{handle}}</span></span
-        ><span>© <span id="year">2026</span> {{brand_name}}</span
-        ><a href="#inicio"
-          >Voltar ao início <span aria-hidden="true">↑</span></a
-        >
+        ><span>© <span id="year">2026</span> {{brand_name}}</span>
       </div>
     </footer>
+    <a class="back-to-top" href="#inicio" aria-label="Voltar ao início" title="Voltar ao início" hidden>
+      <svg aria-hidden="true"><use href="#icon-arrow-up" /></svg>
+    </a>
     <script src="navigation.js"></script>
     <script src="config.js"></script>
     <script src="script.js"></script>

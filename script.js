@@ -18,8 +18,10 @@
     const desc=line.querySelector('.discord-description');desc.textContent='O espaço da comunidade ZECAO.';
   }
   const button=document.getElementById('play-trailer');
-  button?.addEventListener('click',()=>{
+  button?.addEventListener('click',event=>{
+    if(event.metaKey||event.ctrlKey||event.shiftKey||event.altKey||event.button!==0)return;
     if(!validId(cfg.trailerVideoId))return;
+    event.preventDefault();
     const iframe=document.createElement('iframe');
     iframe.src='https://www.youtube-nocookie.com/embed/'+cfg.trailerVideoId+'?autoplay=1&rel=0';
     iframe.title='ZECAO — apresentação do canal';

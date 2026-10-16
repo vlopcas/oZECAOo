@@ -2,6 +2,42 @@
   'use strict';
 
   const header = document.querySelector('.site-header');
+  const backToTop = document.querySelector('.back-to-top');
+  const wordmark = document.querySelector('.wordmark');
+  let scrollUpdatePending = false;
+
+  function updateScrollState() {
+    scrollUpdatePending = false;
+    const scrollPosition = window.scrollY;
+    const showBackToTop = scrollPosition > Math.max(400, window.innerHeight * 0.75);
+    header?.classList.toggle('header-scrolled', scrollPosition >= 16);
+
+    if (backToTop) {
+      // Return focus to a visible control before the floating link disappears.
+      if (!showBackToTop && backToTop.contains(document.activeElement)) {
+        wordmark?.focus({ preventScroll: true });
+      }
+      backToTop.hidden = !showBackToTop;
+    }
+  }
+
+  function scheduleScrollUpdate() {
+    if (scrollUpdatePending) return;
+    scrollUpdatePending = true;
+    window.requestAnimationFrame(updateScrollState);
+  }
+
+  backToTop?.addEventListener('click', function (event) {
+    if (event.defaultPrevented || event.button !== 0 || event.metaKey || event.ctrlKey || event.shiftKey || event.altKey) return;
+    // Keep the native anchor and CSS scroll behavior, including reduced motion.
+    wordmark?.focus({ preventScroll: true });
+  });
+
+  window.addEventListener('scroll', scheduleScrollUpdate, { passive: true });
+  window.addEventListener('resize', scheduleScrollUpdate, { passive: true });
+  window.addEventListener('pageshow', scheduleScrollUpdate);
+  updateScrollState();
+
   const toggle = header?.querySelector('.menu-toggle');
   const navigation = header?.querySelector('#header-navigation');
   if (!header || !toggle || !navigation) return;

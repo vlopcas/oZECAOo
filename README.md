@@ -40,6 +40,8 @@ A consulta ao YouTube gera `dist/data/videos.json`. Os arquivos gerados em `dist
 
 O layout usa CSS e SVG inline, sem bibliotecas, fontes externas ou analytics. O player de `youtube-nocookie.com` só é criado após um clique.
 
+A navbar acompanha a rolagem e mantém as seções abaixo dela ao navegar pelas âncoras. O botão circular de retorno aparece após 400 px ou 75% da altura da tela, o que for maior. Nas redes, os ícones são os links, com alvos de toque e nomes acessíveis. A apresentação mantém o play visível no canto inferior esquerdo; sem JavaScript, a própria capa abre o vídeo no YouTube.
+
 ## Atualização dos vídeos e build
 
 O workflow `.github/workflows/deploy.yml` executa em pushes para `main`, manualmente e quatro vezes ao dia. A ordem é **testes → consulta do Atom → build em `dist/` → publicação**.
