@@ -26,7 +26,7 @@ VALID_VIDEO_ID = re.compile(r"^[A-Za-z0-9_-]{11}$")
 VALID_CHANNEL_ID = re.compile(r"^UC[A-Za-z0-9_-]{22}$")
 
 
-def parse_feed(xml_bytes, limit=8):
+def parse_feed(xml_bytes, limit=2, excluded_id=""):
     """Seleciona publicações válidas na ordem fornecida pelo Atom, sem duplicar."""
     if isinstance(limit, bool) or not isinstance(limit, int) or limit < 1:
         raise ValueError("limite de vídeos deve ser um inteiro positivo")
@@ -35,7 +35,7 @@ def parse_feed(xml_bytes, limit=8):
     seen = set()
     for entry in root.findall(f"{ATOM}entry"):
         id_text = entry.findtext(f"{YT}videoId")
-        if not id_text or not VALID_VIDEO_ID.fullmatch(id_text) or id_text in seen:
+        if not id_text or not VALID_VIDEO_ID.fullmatch(id_text) or id_text == excluded_id or id_text in seen:
             continue
         title = (entry.findtext(f"{ATOM}title") or "Vídeo ZECAO").strip() or "Vídeo ZECAO"
         published = entry.findtext(f"{ATOM}published") or ""
@@ -54,7 +54,7 @@ def parse_feed(xml_bytes, limit=8):
     return results
 
 
-def validated_videos(items, limit):
+def validated_videos(items, limit, excluded_id=""):
     """Valida reservas sem confiar em URLs de thumbnails vindas do JSON."""
     if not isinstance(items, list) or not items:
         raise ValueError("lista de vídeos ausente ou vazia")
@@ -67,6 +67,8 @@ def validated_videos(items, limit):
         title = item.get("title")
         if not isinstance(video_id, str) or not VALID_VIDEO_ID.fullmatch(video_id):
             raise ValueError("ID de vídeo inválido")
+        if video_id == excluded_id:
+            continue
         if not isinstance(title, str) or not title.strip():
             raise ValueError("título de vídeo inválido")
         published = item.get("published", "")
@@ -82,15 +84,17 @@ def validated_videos(items, limit):
                 "thumbnail": f"https://i.ytimg.com/vi/{video_id}/maxresdefault.jpg",
             })
             seen.add(video_id)
+    if not result:
+        raise ValueError("reserva sem vídeos válidos além da apresentação")
     return result
 
 
-def load_cached(path, channel_id, limit):
+def load_cached(path, channel_id, limit, excluded_id=""):
     """Retorna apenas um cache válido do canal configurado."""
     payload = json.loads(path.read_text(encoding="utf-8"))
     if not isinstance(payload, dict) or payload.get("channel_id") != channel_id:
         raise ValueError("cache pertence a outro canal ou tem formato inválido")
-    return {**payload, "videos": validated_videos(payload.get("videos"), limit)}
+    return {**payload, "videos": validated_videos(payload.get("videos"), limit, excluded_id)}
 
 
 def write_json(path, payload):
@@ -122,9 +126,12 @@ def main(argv=None):
         channel_id = config.get("youtubeChannelId")
         if not isinstance(channel_id, str) or not VALID_CHANNEL_ID.fullmatch(channel_id):
             raise ValueError("youtubeChannelId inválido")
-        limit = config.get("maxFeedVideos")
+        limit = config.get("maxFeedVideos", 2)
         if isinstance(limit, bool) or not isinstance(limit, int) or not 1 <= limit <= 8:
             raise ValueError("maxFeedVideos deve ser um inteiro de 1 a 8")
+        trailer_id = config.get("trailerVideoId", "")
+        if not isinstance(trailer_id, str) or trailer_id and not VALID_VIDEO_ID.fullmatch(trailer_id):
+            raise ValueError("trailerVideoId inválido")
     except (OSError, ValueError) as exc:
         print(f"ERRO: configuração inválida: {exc}", file=sys.stderr)
         return 1
@@ -140,22 +147,23 @@ def main(argv=None):
             })
             with urllib.request.urlopen(request, timeout=25) as response:
                 body = response.read(2_000_000)
-        videos = parse_feed(body, limit=limit)
+        videos = parse_feed(body, limit=limit, excluded_id=trailer_id)
         if not videos:
             raise ValueError("feed sem vídeos válidos")
     except (OSError, ValueError, urllib.error.URLError, ET.ParseError) as exc:
         print(f"AVISO: não foi possível consultar o YouTube ({exc}).", file=sys.stderr)
         for candidate in (args.output, VERSIONED_FEED):
             try:
-                payload = load_cached(candidate, channel_id, limit)
+                payload = load_cached(candidate, channel_id, limit, trailer_id)
+                cached_ids = [item["id"] for item in json.loads(candidate.read_text(encoding="utf-8"))["videos"]]
             except (OSError, ValueError):
                 continue
-            if candidate != args.output:
+            if candidate != args.output or cached_ids != [item["id"] for item in payload["videos"]]:
                 write_json(args.output, payload)
             print(f"Mantidos {len(payload['videos'])} vídeos da reserva válida: {candidate}.")
             return 0
         try:
-            videos = validated_videos(config.get("fallbackVideos"), limit)
+            videos = validated_videos(config.get("fallbackVideos"), limit, trailer_id)
         except ValueError as fallback_error:
             print(f"ERRO: sem feed e sem reserva válida: {fallback_error}", file=sys.stderr)
             return 1

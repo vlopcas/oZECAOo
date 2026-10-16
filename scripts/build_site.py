@@ -82,7 +82,7 @@ def instagram_embed_url(profile: str) -> str:
     return f"https://www.instagram.com/{username}/embed/"
 
 
-def normalized_videos(items, limit: int) -> list[dict]:
+def normalized_videos(items, limit: int, excluded_id: str = "") -> list[dict]:
     if not isinstance(items, list):
         return []
     result, seen = [], set()
@@ -90,7 +90,7 @@ def normalized_videos(items, limit: int) -> list[dict]:
         if not isinstance(item, dict):
             continue
         video_id = item.get("id")
-        if not isinstance(video_id, str) or not VIDEO_ID.fullmatch(video_id) or video_id in seen:
+        if not isinstance(video_id, str) or not VIDEO_ID.fullmatch(video_id) or video_id == excluded_id or video_id in seen:
             continue
         seen.add(video_id)
         title = item.get("title")
@@ -144,6 +144,7 @@ def load_config(path: Path) -> dict:
     if cfg.get("videosFeedPath") != "data/videos.json":
         raise BuildError("videosFeedPath deve ser data/videos.json.")
     for key, maximum in (("maxFeedVideos", 8), ("maxVisibleVideos", 4)):
+        cfg.setdefault(key, 2)
         if type(cfg.get(key)) is not int or not 1 <= cfg[key] <= maximum:
             raise BuildError(f"{key} deve ser um inteiro entre 1 e {maximum}.")
     if cfg["maxVisibleVideos"] > cfg["maxFeedVideos"]:
@@ -161,7 +162,7 @@ def load_config(path: Path) -> dict:
     required_text(image, "alt")
     if image.get("type") not in ("image/jpeg", "image/png", "image/webp") or any(type(image.get(key)) is not int or image[key] <= 0 for key in ("width", "height")):
         raise BuildError("socialImage deve declarar tipo, largura e altura válidos.")
-    cfg["fallbackVideos"] = normalized_videos(cfg.get("fallbackVideos"), cfg["maxFeedVideos"])
+    cfg["fallbackVideos"] = normalized_videos(cfg.get("fallbackVideos"), cfg["maxFeedVideos"], cfg["trailerVideoId"])
     if not any(v["id"] != cfg["trailerVideoId"] for v in cfg["fallbackVideos"]):
         raise BuildError("fallbackVideos deve conter ao menos um vídeo válido além do trailer.")
     return cfg
@@ -172,7 +173,7 @@ def load_feed(path: Path, cfg: dict) -> dict:
         feed = read_json(path)
     except (OSError, ValueError):
         feed = None
-    items = normalized_videos(feed.get("videos") if isinstance(feed, dict) else None, cfg["maxFeedVideos"])
+    items = normalized_videos(feed.get("videos") if isinstance(feed, dict) else None, cfg["maxFeedVideos"], cfg["trailerVideoId"])
     # A feed belonging to a different channel is not public content for this site.
     wrong_channel = isinstance(feed, dict) and feed.get("channel_id") not in (None, "", cfg["youtubeChannelId"])
     if wrong_channel or not any(v["id"] != cfg["trailerVideoId"] for v in items):

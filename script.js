@@ -62,7 +62,7 @@
   function showVideos(items){
     if(!Array.isArray(items))return;
     const seen=new Set();
-    const limit=Number.isInteger(cfg.maxVisibleVideos)&&cfg.maxVisibleVideos>0?cfg.maxVisibleVideos:4;
+    const limit=Number.isInteger(cfg.maxVisibleVideos)&&cfg.maxVisibleVideos>0?cfg.maxVisibleVideos:2;
     const filtered=items.filter(v=>{
       if(!v||!validId(v.id)||v.id===cfg.trailerVideoId||seen.has(v.id))return false;
       seen.add(v.id);return true;

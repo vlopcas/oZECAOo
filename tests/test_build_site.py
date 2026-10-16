@@ -32,7 +32,7 @@ class BuildSiteTests(unittest.TestCase):
             "socialImage": {"path": "assets/social-preview-v1.jpg", "type": "image/jpeg", "width": 1200, "height": 630, "alt": "Avatar e logo ZECAO"},
             "youtube": "https://www.youtube.com/channel/UCkS1cj-1C9ahgYVvFGz86qw", "youtubeChannelId": "UCkS1cj-1C9ahgYVvFGz86qw",
             "instagram": "https://www.instagram.com/ozecaoo/", "twitch": "https://www.twitch.tv/ozecaoo", "discord": "",
-            "trailer": "https://youtu.be/ItDJkbW2M4A", "trailerVideoId": "ItDJkbW2M4A", "videosFeedPath": "data/videos.json", "maxFeedVideos": 8, "maxVisibleVideos": 4,
+            "trailer": "https://youtu.be/ItDJkbW2M4A", "trailerVideoId": "ItDJkbW2M4A", "videosFeedPath": "data/videos.json", "maxFeedVideos": 2, "maxVisibleVideos": 2,
             "fallbackVideos": [{"id": "EpEauQtpjZ4", "title": "Vídeo de reserva", "published": "2026-10-10T01:00:00Z", "type": "NO YOUTUBE"}],
         }
         self.write_config()
@@ -114,22 +114,36 @@ class BuildSiteTests(unittest.TestCase):
         self.assertEqual(manifest["display"], "browser")
         runtime = (output / "config.js").read_text()
         self.assertIn("window.ZECAO_CONFIG = ", runtime)
-        self.assertIn('"maxVisibleVideos": 4', runtime)
+        self.assertIn('"maxVisibleVideos": 2', runtime)
         self.assertFalse((output / "site.config.json").exists())
         self.assertFalse((output / "llms.txt").exists())
         self.assertFalse((output / "CNAME").exists())
 
-    def test_feed_retains_eight_valid_unique_videos_and_renders_four_without_trailer(self):
+    def test_feed_retains_two_recent_valid_unique_videos_without_trailer(self):
         trailer = {**self.video(1), "id": self.config["trailerVideoId"]}
         self.write_feed([None, {"id": "invalid"}, trailer, self.video(2), self.video(2), *[self.video(index) for index in range(3, 15)]])
         output = self.build()
         feed = json.loads((output / "data" / "videos.json").read_text())
-        self.assertEqual(len(feed["videos"]), 8)
+        self.assertEqual([video["id"] for video in feed["videos"]], ["video000002", "video000003"])
         page = self.read_html()
-        self.assertEqual(page.count('class="video-tile"'), 4)
+        self.assertEqual(page.count('class="video-tile"'), 2)
         self.assertNotIn(f'data-video-id="{self.config["trailerVideoId"]}"', page)
-        self.assertIn('data-video-id="video000005"', page)
-        self.assertNotIn('data-video-id="video000006"', page)
+        self.assertIn('data-video-id="video000003"', page)
+        self.assertNotIn('data-video-id="video000004"', page)
+
+    def test_default_limits_and_configured_reserves_are_two_without_trailer(self):
+        self.config.pop("maxFeedVideos")
+        self.config.pop("maxVisibleVideos")
+        self.config["fallbackVideos"] = [{**self.video(1), "id": self.config["trailerVideoId"]}, *[self.video(index) for index in range(2, 7)]]
+        self.write_config()
+        (self.root / "data" / "videos.json").unlink()
+        output = self.build()
+        feed = json.loads((output / "data" / "videos.json").read_text())
+        self.assertEqual([video["id"] for video in feed["videos"]], ["video000002", "video000003"])
+        runtime = (output / "config.js").read_text()
+        self.assertIn('"maxVisibleVideos": 2', runtime)
+        self.assertNotIn('"video000004"', runtime)
+        self.assertEqual(self.read_html().count('class="video-tile"'), 2)
 
     def test_missing_malformed_empty_foreign_and_invalid_feeds_use_valid_reserve(self):
         feed_path = self.root / "data" / "videos.json"
@@ -197,7 +211,7 @@ class BuildSiteTests(unittest.TestCase):
     def test_runtime_config_changes_invalidate_config_script_only(self):
         self.build()
         previous = self.asset_versions()
-        changes = (("maxVisibleVideos", 3), ("fallbackVideos", [{**self.config["fallbackVideos"][0], "title": "Reserva atualizada"}]))
+        changes = (("maxVisibleVideos", 1), ("fallbackVideos", [{**self.config["fallbackVideos"][0], "title": "Reserva atualizada"}]))
         for key, value in changes:
             with self.subTest(key=key):
                 self.config[key] = value

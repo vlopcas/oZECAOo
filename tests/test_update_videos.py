@@ -14,6 +14,7 @@ from scripts import update_videos as updater
 
 CHANNEL_ID = "UC" + "a" * 22
 OTHER_CHANNEL_ID = "UC" + "b" * 22
+TRAILER_ID = "ItDJkbW2M4A"
 
 
 def atom(entries):
@@ -41,7 +42,11 @@ class ParseFeedTests(unittest.TestCase):
         parsed = updater.parse_feed(atom(entries), limit=3)
         self.assertEqual([item["id"] for item in parsed], ["ID000000000", "ID000000001", "ID000000002"])
         self.assertTrue(all(item["thumbnail"].endswith("/maxresdefault.jpg") for item in parsed))
-        self.assertEqual(len(updater.parse_feed(atom(entries))), 8)
+        self.assertEqual(len(updater.parse_feed(atom(entries))), 2)
+
+    def test_trailer_is_excluded_before_two_recent_entries_are_selected(self):
+        entries = [(TRAILER_ID, "Apresentação"), ("ID000000000", "Primeiro"), ("ID000000001", "Segundo"), ("ID000000002", "Terceiro")]
+        self.assertEqual([item["id"] for item in updater.parse_feed(atom(entries), excluded_id=TRAILER_ID)], ["ID000000000", "ID000000001"])
 
     def test_retains_plain_text_special_characters(self):
         title = '<img src=x onerror="alert(1)"> & “Zecão”'
@@ -64,7 +69,7 @@ class UpdateVideosTests(unittest.TestCase):
         self.output = self.root / "dist" / "data" / "videos.json"
         self.versioned = self.root / "data" / "videos.json"
         self.config_path = self.root / "site.config.json"
-        self.config = {"youtubeChannelId": CHANNEL_ID, "maxFeedVideos": 8,
+        self.config = {"youtubeChannelId": CHANNEL_ID, "maxFeedVideos": 2, "trailerVideoId": TRAILER_ID,
                        "fallbackVideos": [video()]}
         self.save_config()
         self.mock_versioned = patch.object(updater, "VERSIONED_FEED", self.versioned)
@@ -87,7 +92,7 @@ class UpdateVideosTests(unittest.TestCase):
         self.config["youtubeChannelId"] = OTHER_CHANNEL_ID
         self.config["maxFeedVideos"] = 2
         self.save_config()
-        body = atom([(f"ID{number:09}", f"Vídeo {number}") for number in range(4)])
+        body = atom([(TRAILER_ID, "Apresentação"), *[(f"ID{number:09}", f"Vídeo {number}") for number in range(4)]])
         with patch.object(updater.urllib.request, "urlopen", return_value=io.BytesIO(body)) as urlopen:
             self.assertEqual(self.run_update(), 0)
         self.assertEqual(urlopen.call_args.args[0].full_url,
@@ -95,6 +100,15 @@ class UpdateVideosTests(unittest.TestCase):
         generated = json.loads(self.output.read_text())
         self.assertEqual(generated["channel_id"], OTHER_CHANNEL_ID)
         self.assertEqual(len(generated["videos"]), 2)
+        self.assertEqual([item["id"] for item in generated["videos"]], ["ID000000000", "ID000000001"])
+
+    def test_default_limit_is_two_when_omitted_from_config(self):
+        self.config.pop("maxFeedVideos")
+        self.save_config()
+        body = atom([(f"ID{number:09}", f"Vídeo {number}") for number in range(5)])
+        with patch.object(updater.urllib.request, "urlopen", return_value=io.BytesIO(body)):
+            self.assertEqual(self.run_update(), 0)
+        self.assertEqual(len(json.loads(self.output.read_text())["videos"]), 2)
 
     def test_fixture_writes_only_generated_output(self):
         self.write_cache(self.versioned)
@@ -123,6 +137,29 @@ class UpdateVideosTests(unittest.TestCase):
         with patch.object(updater.urllib.request, "urlopen", side_effect=urllib.error.URLError("offline")):
             self.assertEqual(self.run_update(), 0)
         self.assertEqual(self.output.read_bytes(), original)
+
+    def test_network_failure_trims_old_reserves_and_excludes_trailer(self):
+        entries = [video(TRAILER_ID, "Apresentação"), *[video(f"ID{number:09}", f"Vídeo {number}") for number in range(5)]]
+        for reserve in ("generated", "versioned", "configured"):
+            with self.subTest(reserve=reserve):
+                self.output.unlink(missing_ok=True)
+                self.versioned.unlink(missing_ok=True)
+                if reserve == "configured":
+                    self.config["fallbackVideos"] = entries
+                    self.save_config()
+                else:
+                    self.write_cache(self.output if reserve == "generated" else self.versioned, entries)
+                with patch.object(updater.urllib.request, "urlopen", side_effect=urllib.error.URLError("offline")):
+                    self.assertEqual(self.run_update(), 0)
+                generated = json.loads(self.output.read_text())
+                self.assertEqual([item["id"] for item in generated["videos"]], ["ID000000000", "ID000000001"])
+
+    def test_reserve_with_only_trailer_does_not_hide_usable_configured_fallback(self):
+        self.write_cache(self.output, [video(TRAILER_ID, "Apresentação")])
+        self.write_cache(self.versioned, [video(TRAILER_ID, "Apresentação")])
+        with patch.object(updater.urllib.request, "urlopen", side_effect=urllib.error.URLError("offline")):
+            self.assertEqual(self.run_update(), 0)
+        self.assertEqual(json.loads(self.output.read_text())["videos"][0]["id"], "EpEauQtpjZ4")
 
     def test_invalid_generated_cache_recovers_from_versioned_reserve(self):
         self.output.parent.mkdir(parents=True)

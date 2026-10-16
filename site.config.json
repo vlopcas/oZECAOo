@@ -30,8 +30,8 @@
   "trailer": "https://youtu.be/ItDJkbW2M4A",
   "trailerVideoId": "ItDJkbW2M4A",
   "videosFeedPath": "data/videos.json",
-  "maxFeedVideos": 8,
-  "maxVisibleVideos": 4,
+  "maxFeedVideos": 2,
+  "maxVisibleVideos": 2,
   "fallbackVideos": [
     {
       "id": "EpEauQtpjZ4",

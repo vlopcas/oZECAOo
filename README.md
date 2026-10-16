@@ -49,23 +49,23 @@ O build acrescenta uma versão baseada no conteúdo às URLs de CSS e scripts no
 
 A seção usa a incorporação oficial do **perfil**, derivada do link `instagram` de `site.config.json`. As publicações são servidas pelo próprio Instagram, sem cadastrar posts manualmente, consultar uma API autenticada ou manter tokens. O visual interno e a atualização/cache são controlados pelo Instagram; a quantidade de posts não é um contrato do site.
 
-O título e o acesso ao perfil seguem a tipografia e o estilo de links das demais seções. Uma ilustração SVG decorativa com molduras e montanhas nas cores da marca equilibra a coluna de texto no desktop e usa uma versão compacta no celular. O conteúdo interno da incorporação mantém a aparência oficial do Instagram.
+O título **Bastidores, avisos e novidades** e o subtítulo **Pelo Instagram** seguem a tipografia das demais seções. Uma ilustração SVG decorativa maior, com molduras e montanhas nas cores da marca, fica próxima dos textos no desktop e é ocultada no celular. O conteúdo interno da incorporação mantém a aparência oficial do Instagram.
 
 O iframe só recebe seu endereço quando a seção chega a 320 px da área visível. A altura acompanha as mensagens oficiais `MEASURE`, aceitas apenas da origem HTTPS do Instagram e da janela daquele iframe, com limites para valores inválidos. A altura inicial reserva espaço antes do carregamento; a rolagem nativa do iframe fica disponível caso o serviço mude seu comportamento. O site não carrega o SDK de embeds separadamente.
 
-O acesso **Ver no Instagram** permanece disponível mesmo com o serviço bloqueado ou JavaScript desabilitado. Sem JavaScript, o espaço vazio da incorporação fica oculto. O perfil precisa continuar público, disponível e com incorporações permitidas. Consulte a [documentação oficial de incorporações](https://developers.facebook.com/docs/instagram-platform/oembed/).
+O perfil pode ser acessado pelo próprio embed ou pelo ícone do Instagram na seção **Me encontra por aí**, disponível mesmo com o serviço bloqueado ou JavaScript desabilitado. Sem JavaScript, o espaço vazio da incorporação fica oculto. O perfil precisa continuar público, disponível e com incorporações permitidas. Consulte a [documentação oficial de incorporações](https://developers.facebook.com/docs/instagram-platform/oembed/).
 
-Se o Instagram não enviar uma medida válida em 12 segundos, a caixa da prévia é recolhida, preservando o link. Uma resposta válida posterior restaura a prévia, sem nova consulta ou atualização da página.
+Se o Instagram não enviar uma medida válida em 12 segundos, a caixa da prévia é recolhida. O acesso ao perfil na seção de redes permanece disponível. Uma resposta válida posterior restaura a prévia, sem nova consulta ou atualização da página.
 
 ## Atualização dos vídeos e build
 
 O workflow `.github/workflows/deploy.yml` executa em pushes para `main`, manualmente e quatro vezes ao dia. A ordem é **testes → consulta do Atom → build em `dist/` → publicação**.
 
-O atualizador consulta uma única vez o Atom público do canal e seleciona até **8 publicações recentes**, sem acumular o histórico. O HTML publicado já contém até **4 cards**, excluindo o vídeo fixo de apresentação: títulos e links podem ser lidos mesmo com JavaScript desabilitado. O navegador mantém as interações e os fallbacks das imagens sem substituir inicialmente os cards atuais por reservas antigas.
+O atualizador consulta uma única vez o Atom público do canal e seleciona somente as **2 publicações mais recentes**, sem acumular o histórico. O vídeo fixo de apresentação é excluído antes da seleção, sem ocupar uma dessas duas vagas. O JSON gerado, os cards no HTML publicado e o navegador usam esse mesmo limite. Títulos e links podem ser lidos mesmo com JavaScript desabilitado; o navegador mantém as interações e os fallbacks das imagens sem substituir inicialmente os cards atuais por reservas antigas.
 
 As thumbnails priorizam WebP/JPG de alta resolução quando disponíveis; depois tentam SD, HQ e a arte local. A atualização não faz uma requisição adicional por vídeo. O Atom mistura vídeos, lives e Shorts e não informa seu formato com precisão, por isso os itens do feed usam a indicação genérica “NO YOUTUBE”.
 
-Se houver falha de rede, XML inválido ou feed vazio, o atualizador usa, nesta ordem: JSON gerado existente válido do mesmo canal; `data/videos.json` versionado válido do mesmo canal; `fallbackVideos` válidos da configuração. Se nenhuma reserva for válida, a execução falha sem publicar JSON malformado. Cada execução do Actions começa com o checkout, sem recuperar o feed do deploy anterior; o cache gerado só é preservado quando já existe naquela execução ou ambiente local.
+Se houver falha de rede, XML inválido ou feed vazio, o atualizador usa, nesta ordem: JSON gerado existente válido do mesmo canal; `data/videos.json` versionado válido do mesmo canal; `fallbackVideos` válidos da configuração. As reservas também excluem a apresentação e ficam limitadas a dois vídeos, inclusive quando um cache antigo contém mais entradas. Se nenhuma reserva for válida, a execução falha sem publicar JSON malformado. Cada execução do Actions começa com o checkout, sem recuperar o feed do deploy anterior; o cache gerado só é preservado quando já existe naquela execução ou ambiente local.
 
 A atualização não é em tempo real e os agendamentos podem atrasar. O GitHub pode desativar agendamentos de repositórios públicos após 60 dias sem atividade. O build não usa a hora da consulta do feed como uma alteração da página.
 
