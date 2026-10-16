@@ -57,7 +57,7 @@ A compra de um domínio é opcional e independente do código. Os caminhos relat
 1. Em **Settings → Pages → Custom domain**, informe o domínio escolhido e salve.
 2. Configure o DNS conforme a [documentação do GitHub Pages](https://docs.github.com/en/pages/configuring-a-custom-domain-for-your-github-pages-site/managing-a-custom-domain-for-your-github-pages-site). Para `www` ou outro subdomínio, o CNAME no DNS aponta para `vlopcas.github.io`, sem `/oZECAOo/`. Para o domínio raiz, use os registros indicados na documentação.
 3. Aguarde a validação do DNS e a emissão do certificado, e confirme **Enforce HTTPS**.
-4. Atualize `og:image` no `index.html` com a URL absoluta da imagem no domínio definitivo.
+4. Atualize `og:url` e `og:image` no `index.html` com as URLs absolutas da página e da imagem no domínio definitivo.
 
 Com publicação por GitHub Actions, não é necessário adicionar um arquivo `CNAME` ao repositório. O registro CNAME no DNS é uma configuração separada.
 
@@ -73,10 +73,12 @@ Com publicação por GitHub Actions, não é necessário adicionar um arquivo `C
 - `assets/`: artes do ZECAO (banner, avatar, Z, thumb, wallpaper).
 - `scripts/update_videos.py`: atualização automática via feed Atom.
 
-O layout usa CSS e SVG inline, sem bibliotecas, fontes externas ou analytics. As thumbnails são carregadas de `i.ytimg.com`; o player do YouTube em `youtube-nocookie.com` só é criado após um clique. O `og:image` usa a URL inicial do GitHub Pages; depois de configurar o domínio definitivo, atualize essa URL para manter a prévia em redes sociais.
+O layout usa CSS e SVG inline, sem bibliotecas, fontes externas ou analytics. As thumbnails são carregadas de `i.ytimg.com`; o player do YouTube em `youtube-nocookie.com` só é criado após um clique. `og:url` e `og:image` usam a URL inicial do GitHub Pages; depois de configurar o domínio definitivo, atualize essas URLs para manter a prévia em redes sociais.
 
 ## Imagens
 
 As artes principais já são WebP: banner (1648 × 927, cerca de 190 KB), boas-vindas (1120 × 630, 82 KB), wallpaper (1400 × 788, 101 KB), avatar (600 × 600, 22 KB) e logo (650 × 650, 9 KB). Os PNGs são reservados aos ícones de navegador, Apple e atalhos; o favicon também tem versão ICO. WebM é um formato de vídeo.
 
 As thumbnails mais nítidas dependem da resolução disponível no YouTube. Nos dois vídeos recentes verificados, o WebP de 1280 × 720 pesa cerca de 98–105 KB, aproximadamente metade do JPG equivalente. As capas usam carregamento sob demanda (`loading="lazy"`).
+
+A imagem de compartilhamento é `assets/social-preview-v1.jpg`, em JPEG de 1200 × 630: avatar ilustrado em primeiro plano, logo ZECAO e montanhas nas cores da marca. Foi composta com imagegen a partir de `avatar.webp`, `hero.webp` e `wallpaper-wide.webp`; o prompt está em `docs/social-preview-v1.prompt.txt`. Os metadados Open Graph declaram URL absoluta, tipo, dimensões e descrição da imagem. A imagem não é carregada como parte do layout da página.
