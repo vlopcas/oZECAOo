@@ -29,7 +29,7 @@ jobs:
       - name: Validar geração e reservas do site
         run: python3 -m unittest discover -s tests -v
       - name: Consultar vídeos públicos do YouTube
-        run: python3 scripts/update_videos.py
+        run: python3 scripts/update_videos.py --preserve-published
       - name: Montar site estático
         run: python3 scripts/build_site.py --feed dist/data/videos.json
       - name: Preparar GitHub Pages

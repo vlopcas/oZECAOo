@@ -70,11 +70,15 @@ class UpdateVideosTests(unittest.TestCase):
         self.versioned = self.root / "data" / "videos.json"
         self.config_path = self.root / "site.config.json"
         self.config = {"youtubeChannelId": CHANNEL_ID, "maxFeedVideos": 2, "trailerVideoId": TRAILER_ID,
-                       "fallbackVideos": [video()]}
+                       "fallbackVideos": [video()], "siteUrl": "https://ozecaoo.com/",
+                       "videosFeedPath": "data/videos.json"}
         self.save_config()
         self.mock_versioned = patch.object(updater, "VERSIONED_FEED", self.versioned)
         self.mock_versioned.start()
         self.addCleanup(self.mock_versioned.stop)
+        sleep_patcher = patch.object(updater.time, "sleep")
+        self.mock_sleep = sleep_patcher.start()
+        self.addCleanup(sleep_patcher.stop)
 
     def save_config(self):
         self.config_path.write_text(json.dumps(self.config), encoding="utf-8")
@@ -118,6 +122,7 @@ class UpdateVideosTests(unittest.TestCase):
         with patch.object(updater.urllib.request, "urlopen") as urlopen:
             self.assertEqual(self.run_update("--fixture", str(fixture)), 0)
             urlopen.assert_not_called()
+        self.mock_sleep.assert_not_called()
         self.assertEqual(self.versioned.read_bytes(), original)
         self.assertEqual(json.loads(self.output.read_text())["videos"][0]["id"], "l3k6mkxiYPI")
 
@@ -215,6 +220,126 @@ class UpdateVideosTests(unittest.TestCase):
             self.assertEqual(self.run_update(), 1)
             urlopen.assert_not_called()
         self.assertFalse(self.output.exists())
+
+    def test_retries_youtube_404_then_publishes_current_videos(self):
+        missing = urllib.error.HTTPError("https://www.youtube.com/feeds/videos.xml", 404,
+                                         "Not Found", None, None)
+        body = atom([("ID000000001", "Recente"), ("ID000000002", "Anterior")])
+        with patch.object(updater.urllib.request, "urlopen", side_effect=[missing, io.BytesIO(body)]) as urlopen:
+            self.assertEqual(self.run_update("--preserve-published"), 0)
+        self.assertEqual(urlopen.call_count, 2)
+        self.mock_sleep.assert_called_once_with(1)
+        self.assertTrue(all("youtube.com/feeds/videos.xml" in call.args[0].full_url
+                            for call in urlopen.call_args_list))
+        self.assertEqual([item["id"] for item in json.loads(self.output.read_text())["videos"]],
+                         ["ID000000001", "ID000000002"])
+
+    def test_invalid_or_empty_atom_is_retried(self):
+        bodies = [b"<broken>", atom([]), atom([("ID000000001", "Novo")])]
+        with patch.object(updater.urllib.request, "urlopen", side_effect=[io.BytesIO(body) for body in bodies]) as urlopen:
+            self.assertEqual(self.run_update(), 0)
+        self.assertEqual(urlopen.call_count, 3)
+        self.assertEqual([call.args for call in self.mock_sleep.call_args_list], [(1,), (2,)])
+        self.assertEqual(json.loads(self.output.read_text())["videos"][0]["id"], "ID000000001")
+
+    def test_preserves_published_feed_in_clean_runner_instead_of_old_versioned_reserve(self):
+        self.write_cache(self.versioned, [video("ID000000000", "Reserva antiga")])
+        original_reserve = self.versioned.read_bytes()
+        payload = {"source": "youtube_atom", "channel_id": CHANNEL_ID,
+                   "updated_at": "2026-10-20T19:00:00+00:00",
+                   "videos": [video(TRAILER_ID, "Apresentação"),
+                              video("ID000000001", "<Novo> & recente"),
+                              video("ID000000002", "Segundo recente"),
+                              video("ID000000003", "Terceiro")]}
+        offline = urllib.error.URLError("offline")
+        responses = [offline, offline, offline, io.BytesIO(json.dumps(payload).encode())]
+        with patch.object(updater.urllib.request, "urlopen", side_effect=responses) as urlopen:
+            self.assertEqual(self.run_update("--preserve-published"), 0)
+        self.assertEqual(urlopen.call_count, 4)
+        self.assertEqual(urlopen.call_args.args[0].full_url, "https://ozecaoo.com/data/videos.json")
+        self.assertEqual(urlopen.call_args.kwargs["timeout"], 15)
+        generated = json.loads(self.output.read_text())
+        self.assertEqual([item["id"] for item in generated["videos"]], ["ID000000001", "ID000000002"])
+        self.assertEqual(generated["videos"][0]["title"], "<Novo> & recente")
+        self.assertEqual(generated["updated_at"], payload["updated_at"])
+        self.assertEqual(generated["source"], "youtube_atom")
+        self.assertEqual(self.versioned.read_bytes(), original_reserve)
+
+    def test_published_recovery_failure_never_changes_output_or_uses_old_reserves(self):
+        self.write_cache(self.versioned)
+        offline = urllib.error.URLError("offline")
+        invalid_payloads = [
+            offline,
+            b"not JSON",
+            b"[]",
+            json.dumps({"channel_id": OTHER_CHANNEL_ID, "videos": [video()]}).encode(),
+            json.dumps({"channel_id": CHANNEL_ID, "videos": [video("invalid")]}).encode(),
+            json.dumps({"channel_id": CHANNEL_ID, "videos": [video(title=" ")]}).encode(),
+            json.dumps({"channel_id": CHANNEL_ID, "videos": [video(TRAILER_ID)]}).encode(),
+            b" " * 256_001,
+        ]
+        for existing_output in (False, True):
+            for invalid in invalid_payloads:
+                with self.subTest(existing_output=existing_output, invalid_type=type(invalid).__name__):
+                    self.output.unlink(missing_ok=True)
+                    if existing_output:
+                        self.write_cache(self.output, [video("ID000000001", "Já gerado")])
+                    original = self.output.read_bytes() if self.output.exists() else None
+                    response = invalid if isinstance(invalid, Exception) else io.BytesIO(invalid)
+                    with patch.object(updater.urllib.request, "urlopen", side_effect=[offline] * 3 + [response]):
+                        self.assertEqual(self.run_update("--preserve-published"), 1)
+                    if existing_output:
+                        self.assertEqual(self.output.read_bytes(), original)
+                    else:
+                        self.assertFalse(self.output.exists())
+
+    def test_preserve_flag_with_fixture_never_fetches_or_sleeps_even_on_invalid_fixture(self):
+        fixture = self.root / "fixture.xml"
+        self.write_cache(self.output)
+        for body, result in ((atom([("ID000000001", "Novo")]), 0), (b"<broken>", 1), (atom([]), 1)):
+            with self.subTest(body=body):
+                fixture.write_bytes(body)
+                original = self.output.read_bytes()
+                with patch.object(updater.urllib.request, "urlopen") as urlopen:
+                    self.assertEqual(self.run_update("--preserve-published", "--fixture", str(fixture)), result)
+                    urlopen.assert_not_called()
+                if result:
+                    self.assertEqual(self.output.read_bytes(), original)
+        self.mock_sleep.assert_not_called()
+
+    def test_unsafe_recovery_url_is_rejected_before_any_network_request(self):
+        for site_url in (None, "http://ozecaoo.com/", "//ozecaoo.com/", "https://user:pass@ozecaoo.com/",
+                         "https://ozecaoo.com:443/", "https://ozecaoo.com/site/", "https://ozecaoo.com/?a=1",
+                         "https://ozecaoo.com/#section", "https://ozecaoo.com/?", "https://ozecaoo.com/#",
+                         " https://ozecaoo.com/", "https://oze\ncaoo.com/", "https://ozecaoo.com\\evil/"):
+            with self.subTest(site_url=site_url):
+                self.config["siteUrl"] = site_url
+                self.save_config()
+                with patch.object(updater.urllib.request, "urlopen") as urlopen:
+                    self.assertEqual(self.run_update("--preserve-published"), 1)
+                    urlopen.assert_not_called()
+                self.assertFalse(self.output.exists())
+
+    def test_recovery_url_requires_exact_feed_path(self):
+        for path in (None, "../videos.json", "/data/videos.json", "https://other.example/videos.json",
+                     "data/videos.json?cache=1"):
+            with self.subTest(path=path):
+                self.config["videosFeedPath"] = path
+                self.save_config()
+                with patch.object(updater.urllib.request, "urlopen") as urlopen:
+                    self.assertEqual(self.run_update("--preserve-published"), 1)
+                    urlopen.assert_not_called()
+
+    def test_warning_annotation_is_only_emitted_inside_github_actions(self):
+        offline = urllib.error.URLError("offline")
+        for in_actions in ("true", "false"):
+            with self.subTest(in_actions=in_actions), patch.dict(updater.os.environ, {"GITHUB_ACTIONS": in_actions}), \
+                 patch.object(updater.urllib.request, "urlopen", side_effect=offline), \
+                 contextlib.redirect_stdout(io.StringIO()) as stdout, \
+                 contextlib.redirect_stderr(io.StringIO()):
+                self.assertEqual(updater.main(["--config", str(self.config_path), "--output", str(self.output),
+                                               "--preserve-published"]), 1)
+                self.assertEqual("::warning::" in stdout.getvalue(), in_actions == "true")
 
 
 if __name__ == "__main__":
