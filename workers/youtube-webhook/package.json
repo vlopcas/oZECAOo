@@ -1,0 +1,24 @@
+{
+  "name": "ozecaoo-youtube-webhook",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "test": "tsx --test test/*.test.ts",
+    "typecheck": "tsc --noEmit",
+    "check": "npm run typecheck && npm test",
+    "dev": "wrangler dev",
+    "configure-secrets": "python3 tools/configure_secrets.py",
+    "preflight": "python3 tools/cloudflare_preflight.py",
+    "dry-run": "wrangler deploy --dry-run --outdir .dry-run",
+    "deploy": "wrangler deploy --secrets-file .secrets.local.json"
+  },
+  "dependencies": {"saxes": "6.0.0"},
+  "devDependencies": {
+    "@cloudflare/workers-types": "5.20261104.1",
+    "@types/node": "^24.0.0",
+    "tsx": "^4.0.0",
+    "typescript": "7.0.2",
+    "wrangler": "4.157.0"
+  }
+}

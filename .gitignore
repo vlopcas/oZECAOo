@@ -3,3 +3,14 @@
 dist/
 __pycache__/
 *.py[cod]
+
+# Worker dependencies, local runtime state and unversioned credentials.
+workers/**/node_modules/
+workers/**/.wrangler/
+workers/**/.dry-run/
+workers/**/.dev.vars
+workers/**/.dev.vars.*
+workers/**/.env
+workers/**/.env.*
+workers/**/.secrets*.json
+workers/**/.preflight*.json

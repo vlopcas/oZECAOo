@@ -98,6 +98,24 @@ class VideoSyncTests(unittest.TestCase):
     def report(self):
         return json.loads(self.report_path.read_text())
 
+    def test_trigger_context_does_not_override_api_selection_or_enter_public_feed(self):
+        self.recent.side_effect = None
+        self.recent.return_value = [video(3), video(2)]
+        with patch.dict(os.environ, {"SYNC_GITHUB_EVENT": "workflow_dispatch", "SYNC_TRIGGER_SOURCE": "websub",
+                                     "SYNC_BATCH_ID": "batch-123", "SYNC_VIDEO_IDS": "ID000000099,invalid,ID000000099"}):
+            self.assertEqual(self.run_sync(), 0)
+        self.assertEqual(self.report()["trigger"], {"event": "workflow_dispatch", "source": "websub",
+                                                  "batch_id": "batch-123", "video_ids": ["ID000000099"]})
+        self.assertEqual([v["id"] for v in self.feed()["videos"]], ["ID000000003", "ID000000002"])
+        self.assertNotIn("trigger", self.feed())
+
+    def test_schedule_source_cannot_be_spoofed_by_dispatch_context(self):
+        with patch.dict(os.environ, {"SYNC_GITHUB_EVENT": "schedule", "SYNC_TRIGGER_SOURCE": "websub",
+                                     "SYNC_BATCH_ID": "<script>", "SYNC_VIDEO_IDS": ""}):
+            self.assertEqual(self.run_sync(), 0)
+        self.assertEqual(self.report()["trigger"]["source"], "schedule")
+        self.assertIsNone(self.report()["trigger"]["batch_id"])
+
     def test_primary_api_updates_without_atom_and_receives_published_known_ids(self):
         selected = [video(3), video(2)]
         self.recent.side_effect = None

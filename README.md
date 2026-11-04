@@ -61,6 +61,8 @@ Se o Instagram não enviar uma medida válida em 12 segundos, a caixa da prévia
 
 ## Atualização dos vídeos e build
 
+A atualização por eventos fica em [workers/youtube-webhook](workers/youtube-webhook/README.md): receptor WebSub autenticado, Durable Object SQLite e `workflow_dispatch`. O Python e a prioridade API v3 → Atom validado → JSON publicado permanecem responsáveis pelos dados. O agendamento de reconciliação continua com quatro execuções diárias.
+
 O workflow `.github/workflows/deploy.yml` executa em pushes para `main`, manualmente e quatro vezes ao dia. A ordem é **testes → sincronização YouTube → build em `dist/` → publicação → resumo**, com o resumo também executado em falhas.
 
 O atualizador usa **YouTube Data API v3 → Atom com validação pela API → último JSON publicado**. O secret existente **`YOUTUBE_API_KEY`** é passado apenas ao Python na etapa de sincronização. Não há OAuth, backend ou dependências externas. Somente os **2 vídeos públicos elegíveis mais recentes** são selecionados, excluindo o trailer, duplicatas, privados, indisponíveis, lives futuras e em andamento. Lives encerradas precisam ter gravação processada e metadados válidos. O HTML continua com os mesmos cards e pode ser lido sem JavaScript.

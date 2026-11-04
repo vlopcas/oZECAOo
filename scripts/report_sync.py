@@ -118,6 +118,16 @@ def render_summary(report, build_result="unknown", deploy_result="unknown"):
         f"- Idade dos dados preservados: {preserved_age(report)}", "",
         "### Vídeos", "",
     ]
+    trigger = report.get("trigger")
+    if isinstance(trigger, dict):
+        context = [f"- Acionamento: {safe_text(trigger.get('source'))}",
+                   f"- Evento GitHub: {safe_text(trigger.get('event'))}"]
+        if trigger.get("batch_id"):
+            context.append(f"- Lote do Worker: {safe_text(trigger['batch_id'], 80)}")
+        ids = trigger.get("video_ids")
+        if isinstance(ids, list) and ids:
+            context.append("- IDs anunciados (contexto, sem alterar seleção): " + ", ".join(safe_text(value, 11) for value in ids[:50]))
+        lines[6:6] = context + [""]
     lines.extend(f"- {safe_text(video['id'], 11)} — {safe_text(video['title'])}" for video in videos)
     if not videos:
         lines.append("Nenhum vídeo selecionado.")

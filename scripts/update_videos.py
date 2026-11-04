@@ -245,6 +245,21 @@ def emit_result(args, state, source, channel_id, videos, attempted_at,
         "last_success_at": successful_at,
         "fallback_reasons": [safe_text(reason) for reason in reasons],
     }
+    event = os.environ.get("SYNC_GITHUB_EVENT", "local")
+    if event not in ("workflow_dispatch", "schedule", "push", "local"):
+        event = "unknown"
+    trigger_source = os.environ.get("SYNC_TRIGGER_SOURCE", "manual")
+    if event != "workflow_dispatch":
+        trigger_source = event
+    elif trigger_source not in ("manual", "websub", "websub_test"):
+        trigger_source = "manual"
+    batch = os.environ.get("SYNC_BATCH_ID", "")
+    report["trigger"] = {
+        "event": event, "source": trigger_source,
+        "batch_id": batch if re.fullmatch(r"[A-Za-z0-9_-]{1,80}", batch) else None,
+        "video_ids": list(dict.fromkeys(value for value in os.environ.get("SYNC_VIDEO_IDS", "")[:1000].split(",")
+                                        if VALID_VIDEO_ID.fullmatch(value)))[:50],
+    }
     if args.report:
         # Runtime report lives outside dist; it is never a Pages artifact.
         write_json(args.report, report)

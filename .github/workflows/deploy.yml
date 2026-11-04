@@ -1,4 +1,5 @@
 name: ZECAO • Atualização do YouTube e publicação
+run-name: "ZECAO · ${{ github.event_name == 'workflow_dispatch' && inputs.trigger_source || github.event_name }} · ${{ inputs.batch_id || github.run_id }}"
 
 on:
   push:
@@ -7,6 +8,20 @@ on:
     # 4 vezes ao dia; horários em UTC. Execuções agendadas podem atrasar.
     - cron: '17 1,7,13,19 * * *'
   workflow_dispatch:
+    inputs:
+      trigger_source:
+        description: Origem do acionamento
+        type: choice
+        default: manual
+        options: [manual, websub, websub_test]
+      batch_id:
+        description: Identificador de lote do Worker (opcional na execução manual)
+        type: string
+        required: false
+      video_ids:
+        description: IDs anunciados, apenas para diagnóstico (não altera a seleção da API)
+        type: string
+        required: false
 
 permissions:
   contents: read
@@ -33,6 +48,10 @@ jobs:
         env:
           YOUTUBE_API_KEY: ${{ secrets.YOUTUBE_API_KEY }}
           YOUTUBE_SYNC_REPORT: ${{ runner.temp }}/youtube-sync.json
+          SYNC_GITHUB_EVENT: ${{ github.event_name }}
+          SYNC_TRIGGER_SOURCE: ${{ inputs.trigger_source || '' }}
+          SYNC_BATCH_ID: ${{ inputs.batch_id || '' }}
+          SYNC_VIDEO_IDS: ${{ inputs.video_ids || '' }}
         run: python3 scripts/update_videos.py --preserve-published --report "$YOUTUBE_SYNC_REPORT"
       - name: Montar site estático
         id: build

@@ -1,0 +1,28 @@
+{
+  "$schema": "node_modules/wrangler/config-schema.json",
+  "name": "ozecaoo-youtube-webhook",
+  "account_id": "2552f14f74c2fd54c2ea4172df1fae62",
+  "main": "src/index.ts",
+  "compatibility_date": "2026-11-04",
+  "workers_dev": false,
+  "routes": [{ "pattern": "hooks.ozecaoo.com", "custom_domain": true }],
+  "vars": {
+    "CHANNEL_ID": "UCkS1cj-1C9ahgYVvFGz86qw",
+    "CALLBACK_URL": "https://hooks.ozecaoo.com/youtube",
+    "GITHUB_OWNER": "vlopcas",
+    "GITHUB_REPO": "oZECAOo",
+    "GITHUB_WORKFLOW": "deploy.yml",
+    "GITHUB_REF": "main",
+    "DISPATCH_ENABLED": "false"
+  },
+  "durable_objects": {
+    "bindings": [{ "name": "COORDINATOR", "class_name": "ChannelCoordinator" }]
+  },
+  "migrations": [{ "tag": "v1", "new_sqlite_classes": ["ChannelCoordinator"] }],
+  "triggers": { "crons": ["23 */6 * * *"] },
+  "observability": {
+    "enabled": true,
+    "head_sampling_rate": 1,
+    "logs": { "enabled": true, "invocation_logs": false }
+  }
+}

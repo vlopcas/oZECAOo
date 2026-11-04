@@ -28,6 +28,16 @@ class ReportSyncTests(unittest.TestCase):
     def write_report(self, value):
         self.path.write_text(json.dumps(value), encoding="utf-8")
 
+    def test_summary_distinguishes_websub_controlled_test_and_manual_sources(self):
+        for source in ("schedule", "manual", "websub", "websub_test"):
+            with self.subTest(source=source):
+                value = report(trigger={"source": source, "event": "workflow_dispatch", "batch_id": "batch-123",
+                                        "video_ids": ["ID000000001"]})
+                summary = reporter.render_summary(value)
+                self.assertIn("Acionamento: " + reporter.safe_text(source), summary)
+                self.assertIn("Lote do Worker: batch\\-123", summary)
+                self.assertIn("IDs anunciados (contexto, sem alterar seleção)", summary)
+
     def test_updated_summary_reports_source_videos_and_independent_deployment_failure(self):
         self.write_report(report())
         summary = reporter.render_summary(reporter.load_report(self.path), "success", "failure")
