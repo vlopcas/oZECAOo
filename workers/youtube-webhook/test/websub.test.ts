@@ -161,7 +161,7 @@ test("subscription sends fixed HTTPS hub and protocol parameters; 202 and 204 ar
       globalThis.fetch = async (input, init) => {
         assert.equal(input, HUB);
         assert.equal(init?.method, "POST");
-        assert.equal(init?.redirect, "error");
+        assert.equal(init?.redirect, "manual");
         assert(init?.signal instanceof AbortSignal);
         const form = new URLSearchParams(String(init?.body));
         assert.equal(form.get("hub.mode"), "subscribe");
@@ -177,6 +177,22 @@ test("subscription sends fixed HTTPS hub and protocol parameters; 202 and 204 ar
       assert.deepEqual(result, { accepted: true, status, reason: "accepted_pending_verification" });
       assert.doesNotMatch(JSON.stringify(result), new RegExp(`${SECRET}|${TOKEN}`));
     }
+  } finally { globalThis.fetch = original; }
+});
+
+test("edge-compatible manual redirects never forward the hub secret", async () => {
+  const original = globalThis.fetch;
+  let calls = 0;
+  try {
+    globalThis.fetch = async (input, init) => {
+      calls++;
+      assert.equal(String(input), HUB);
+      assert.equal(init?.redirect, "manual");
+      return new Response(null, { status: 302, headers: { Location: "https://untrusted.invalid/" } });
+    };
+    assert.deepEqual(await requestSubscription(env(), "subscribe", TOKEN),
+      { accepted: false, status: 302, reason: "hub_rejected" });
+    assert.equal(calls, 1);
   } finally { globalThis.fetch = original; }
 });
 

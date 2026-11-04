@@ -240,13 +240,20 @@ export async function requestSubscription(env: Env, mode: "subscribe" | "unsubsc
   try {
     const response = await fetch(HUB, {
       method: "POST", headers: { "Content-Type": "application/x-www-form-urlencoded;charset=UTF-8" },
-      body, redirect: "error", signal: controller.signal,
+      body, redirect: "manual", signal: controller.signal,
     });
     const status = response.status;
     await response.body?.cancel();
     if (status >= 200 && status < 300) return { accepted: true, status, reason: "accepted_pending_verification" };
     return { accepted: false, status, reason: status === 429 || status >= 500 ? "hub_unavailable" : "hub_rejected" };
-  } catch {
+  } catch (error) {
+    let detail = error instanceof Error ? error.message : "unknown_transport_error";
+    for (const value of [env.WEBSUB_SECRET, env.ADMIN_TOKEN, env.GITHUB_TOKEN, verifyToken]) {
+      if (value) detail = detail.split(value).join("[REDACTED]");
+    }
+    detail = detail.replace(/https?:\/\/\S+/g, "[url]").replace(/(?:sha1|sha256)=[a-f\d]+/gi, "[signature]")
+      .replace(/[\r\n\t]/g, " ").slice(0, 160);
+    log("hub_transport_failed", { reason: controller.signal.aborted ? "timeout" : "network_error", detail });
     return { accepted: false, status: 0, reason: controller.signal.aborted ? "hub_timeout" : "hub_network_error" };
   } finally {
     clearTimeout(timer);

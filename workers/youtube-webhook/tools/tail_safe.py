@@ -9,7 +9,7 @@ import threading
 ROOT = Path(__file__).resolve().parents[1]
 FIELDS = {"event", "channel_id", "timestamp", "video_id", "video_ids", "batch_id", "trigger_source",
           "reason", "status", "accepted", "duplicates", "videos", "recovered", "mode", "lease_seconds",
-          "dispatch_enabled", "permanent", "count"}
+          "dispatch_enabled", "permanent", "count", "detail"}
 
 
 def filtered(item):

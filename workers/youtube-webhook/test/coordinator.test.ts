@@ -68,6 +68,8 @@ function githubStub(options: { runs?: unknown[]; post?: (body: any) => Response 
   published?: unknown; publicFetches?: string[] } = {}) {
   const calls: Array<{ url: string; method: string; body: any }> = [];
   mock.method(globalThis, "fetch", async (input: RequestInfo | URL, init?: RequestInit) => {
+    // Workers supports follow/manual, not the browser's redirect:error mode.
+    assert.equal(init?.redirect, "manual");
     const url = String(input), method = init?.method ?? "GET";
     if (url === "https://ozecaoo.com/data/videos.json") {
       options.publicFetches?.push(url);

@@ -255,7 +255,7 @@ export class ChannelCoordinator {
   private async github(path: string, method = "GET", body?: unknown): Promise<Response> {
     if (!this.env.GITHUB_TOKEN) throw new Error("github_credential_missing");
     return fetch(`https://api.github.com/repos/${this.env.GITHUB_OWNER}/${this.env.GITHUB_REPO}/actions/workflows/${this.env.GITHUB_WORKFLOW}${path}`, {
-      method, redirect: "error", signal: AbortSignal.timeout(10_000),
+      method, redirect: "manual", signal: AbortSignal.timeout(10_000),
       headers: { Authorization: `Bearer ${this.env.GITHUB_TOKEN}`, Accept: "application/vnd.github+json",
         "Content-Type": "application/json", "X-GitHub-Api-Version": "2026-03-10", "User-Agent": "ozecaoo-youtube-webhook" },
       body: body === undefined ? undefined : JSON.stringify(body),
@@ -317,7 +317,7 @@ export class ChannelCoordinator {
       const rateLimit = this.rateLimit(listing);
       await listing.body?.cancel();
       await this.failure(rateLimit ? "github_rate_limited" : "github_run_lookup_failed", listing.status,
-        !rateLimit && [401, 403, 404].includes(listing.status), null, rateLimit ?? 0); return;
+        !rateLimit && ([401, 403, 404].includes(listing.status) || listing.status >= 300 && listing.status < 400), null, rateLimit ?? 0); return;
     }
     let runs: Array<{ display_title?: string; status?: string }>;
     try {
@@ -352,7 +352,7 @@ export class ChannelCoordinator {
     await response.body?.cancel();
     if (status === 200 || status === 204) { await this.completed(batch, false); return; }
     await this.failure(rateLimit ? "github_rate_limited" : "github_dispatch_failed", status,
-      !rateLimit && [400, 401, 403, 404, 422].includes(status), status >= 500, rateLimit ?? 0);
+      !rateLimit && ([400, 401, 403, 404, 422].includes(status) || status >= 300 && status < 400), status >= 500, rateLimit ?? 0);
   }
 
   private rateLimit(response: Response): number | null {
@@ -368,7 +368,7 @@ export class ChannelCoordinator {
   private async publishedVideos(): Promise<PublishedVideo[] | null> {
     try {
       const response = await fetch("https://ozecaoo.com/data/videos.json", {
-        redirect: "error", signal: AbortSignal.timeout(5_000),
+        redirect: "manual", signal: AbortSignal.timeout(5_000),
         headers: { Accept: "application/json", "Cache-Control": "no-cache" },
       });
       if (!response.ok) { await response.body?.cancel(); return null; }

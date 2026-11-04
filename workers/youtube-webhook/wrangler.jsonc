@@ -13,7 +13,7 @@
     "GITHUB_REPO": "oZECAOo",
     "GITHUB_WORKFLOW": "deploy.yml",
     "GITHUB_REF": "main",
-    "DISPATCH_ENABLED": "false"
+    "DISPATCH_ENABLED": "true"
   },
   "durable_objects": {
     "bindings": [{ "name": "COORDINATOR", "class_name": "ChannelCoordinator" }]

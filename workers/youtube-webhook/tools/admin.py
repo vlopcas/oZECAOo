@@ -44,6 +44,7 @@ def main():
         url = f"https://{origin.hostname}/admin/{args.action}"
         request = urllib.request.Request(url, headers={
             "Authorization": "Bearer " + secrets["ADMIN_TOKEN"], "Content-Type": "application/json",
+            "User-Agent": "ozecaoo-websub-admin/1.0",
         }, method="GET" if args.action == "status" else "POST",
             data=None if args.action == "status" else json.dumps(body).encode())
         with urllib.request.build_opener(NoRedirect()).open(request, timeout=25) as response:
