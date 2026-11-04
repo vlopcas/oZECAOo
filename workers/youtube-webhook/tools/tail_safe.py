@@ -5,6 +5,8 @@ import json
 from pathlib import Path
 import subprocess
 import threading
+import os
+import signal
 
 ROOT = Path(__file__).resolve().parents[1]
 FIELDS = {"event", "channel_id", "timestamp", "video_id", "video_ids", "batch_id", "trigger_source",
@@ -32,8 +34,17 @@ def main():
     args = parser.parse_args()
     secrets = json.loads((ROOT / ".secrets.local.json").read_text())
     process = subprocess.Popen(["npx", "wrangler", "tail", "--format", "json"], cwd=ROOT,
-                               stdout=subprocess.PIPE, stderr=subprocess.DEVNULL, text=True)
-    timer = threading.Timer(max(1, min(args.duration, 3600)), process.terminate)
+                               stdout=subprocess.PIPE, stderr=subprocess.DEVNULL, text=True,
+                               start_new_session=os.name == "posix")
+    def stop():
+        try:
+            if os.name == "posix":
+                os.killpg(process.pid, signal.SIGTERM)
+            else:
+                process.terminate()
+        except ProcessLookupError:
+            pass
+    timer = threading.Timer(max(1, min(args.duration, 3600)), stop)
     timer.start()
     buffer = ""
     decoder = json.JSONDecoder()
@@ -52,7 +63,10 @@ def main():
             buffer = buffer.lstrip()[offset:].lstrip()
             if not isinstance(item, dict):
                 continue
-            value = json.dumps(filtered(item), ensure_ascii=False)
+            safe = filtered(item)
+            if not safe["logs"] and safe["outcome"] in ("ok", "canceled"):
+                continue
+            value = json.dumps(safe, ensure_ascii=False)
             for secret in secrets.values():
                 if isinstance(secret, str) and secret:
                     value = value.replace(secret, "[REDACTED]")
@@ -61,7 +75,7 @@ def main():
         pass
     finally:
         timer.cancel()
-        process.terminate()
+        stop()
         process.wait()
     return 0
 

@@ -164,6 +164,40 @@ test("active workflow defers the batch and makes no duplicate dispatch", async (
   assert.equal(storage.alarm, now + 30_000);
 });
 
+test("one explicit administrative test can enqueue while automatic events remain deferred", async () => {
+  const { coordinator, storage } = await harness(true, false);
+  const calls = githubStub({ runs: [{ status: "queued", display_title: "an older push" }] });
+  await coordinator.fetch(request("/test-dispatch", { videoIds: [video().videoId] }));
+  now += 30_000; await coordinator.alarm();
+  const posts = calls.filter(call => call.method === "POST");
+  assert.equal(posts.length, 1);
+  assert.equal(posts[0].body.inputs.trigger_source, "websub_test");
+  assert.equal(Object.keys((await storage.get<any>(KEY)).pending).length, 0);
+});
+
+test("realistic GitHub run metadata above 256KB is accepted with bounded pagination", async () => {
+  const { coordinator, storage } = await harness();
+  const calls = githubStub({ runs: [{ status: "completed", display_title: "older run",
+    repository: { description: "x".repeat(356_000) } }] });
+  await coordinator.fetch(request("/events", { events: [video()] }));
+  now += 30_000; await coordinator.alarm();
+  assert(calls.find(call => call.method === "GET")?.url.includes("per_page=10"));
+  assert.equal(calls.filter(call => call.method === "POST").length, 1);
+  assert.equal(Object.keys((await storage.get<any>(KEY)).pending).length, 0);
+});
+
+test("oversized or malformed GitHub responses keep the durable batch pending", async () => {
+  const { coordinator, storage } = await harness();
+  const calls = githubStub({ runs: [{ status: "completed", display_title: "older run",
+    repository: { description: "x".repeat(512_000) } }] });
+  await coordinator.fetch(request("/events", { events: [video()] }));
+  now += 30_000; await coordinator.alarm();
+  assert.equal(calls.filter(call => call.method === "POST").length, 0);
+  const saved = await storage.get<any>(KEY);
+  assert.equal(Object.keys(saved.pending).length, 1);
+  assert(saved.retryAt > now);
+});
+
 test("authentication failure blocks alarm retries but maintenance can recover after secret repair", async () => {
   const { coordinator, storage } = await harness();
   let repaired = false;

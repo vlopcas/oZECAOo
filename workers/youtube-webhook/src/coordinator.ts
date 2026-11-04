@@ -45,6 +45,24 @@ function json(value: unknown, status = 200): Response {
   return Response.json(value, { status, headers: { "Cache-Control": "no-store" } });
 }
 
+async function boundedJson(response: Response, maximum: number): Promise<unknown> {
+  const reader = response.body?.getReader();
+  if (!reader) throw new Error("empty_response");
+  const decoder = new TextDecoder("utf-8", { fatal: true, ignoreBOM: false });
+  let text = "", size = 0;
+  try {
+    while (true) {
+      const item = await reader.read();
+      if (item.done) break;
+      size += item.value.byteLength;
+      if (size > maximum) { await reader.cancel(); throw new Error("large_response"); }
+      text += decoder.decode(item.value, { stream: true });
+    }
+    text += decoder.decode();
+  } finally { reader.releaseLock(); }
+  return JSON.parse(text);
+}
+
 function dispatchDue(data: Store, now: number): number | null {
   const candidates = Object.entries(data.pending).filter(([, item]) =>
     item.source === "websub_test" || data.subscription.enabled);
@@ -257,7 +275,8 @@ export class ChannelCoordinator {
     return fetch(`https://api.github.com/repos/${this.env.GITHUB_OWNER}/${this.env.GITHUB_REPO}/actions/workflows/${this.env.GITHUB_WORKFLOW}${path}`, {
       method, redirect: "manual", signal: AbortSignal.timeout(10_000),
       headers: { Authorization: `Bearer ${this.env.GITHUB_TOKEN}`, Accept: "application/vnd.github+json",
-        "Content-Type": "application/json", "X-GitHub-Api-Version": "2026-03-10", "User-Agent": "ozecaoo-youtube-webhook" },
+        "Content-Type": "application/json", "X-GitHub-Api-Version": "2026-03-10", "User-Agent": "ozecaoo-youtube-webhook",
+        "Cache-Control": "no-cache" },
       body: body === undefined ? undefined : JSON.stringify(body),
     });
   }
@@ -311,7 +330,7 @@ export class ChannelCoordinator {
       await this.failure("github_configuration_invalid", null, true); return;
     }
     let listing: Response;
-    try { listing = await this.github(`/runs?branch=${encodeURIComponent(this.env.GITHUB_REF)}&per_page=30`); }
+    try { listing = await this.github(`/runs?branch=${encodeURIComponent(this.env.GITHUB_REF)}&per_page=10`); }
     catch { await this.failure("github_run_lookup_unavailable", null); return; }
     if (!listing.ok) {
       const rateLimit = this.rateLimit(listing);
@@ -321,16 +340,20 @@ export class ChannelCoordinator {
     }
     let runs: Array<{ display_title?: string; status?: string }>;
     try {
-      const text = await listing.text();
-      if (text.length > 256_000) throw new Error("large_response");
-      const body = JSON.parse(text) as { workflow_runs?: unknown };
-      if (!Array.isArray(body.workflow_runs)) throw new Error("invalid_runs");
+      const body = await boundedJson(listing, 512_000) as { workflow_runs?: unknown };
+      if (!Array.isArray(body.workflow_runs) || body.workflow_runs.some(run => !run
+          || typeof run !== "object" || typeof run.display_title !== "string" || typeof run.status !== "string")) {
+        throw new Error("invalid_runs");
+      }
       runs = body.workflow_runs;
     } catch { await this.failure("github_run_lookup_invalid", null); return; }
     if (runs.some(run => typeof run.display_title === "string" && run.display_title.includes(batch.id))) {
       await this.completed(batch, true); return;
     }
-    if (runs.some(run => typeof run.status === "string" && ACTIVE_RUNS.has(run.status))) {
+    // A single explicitly authorized administrative test may be queued behind
+    // existing Actions. Normal hub events remain coalesced until they finish;
+    // GitHub's pages concurrency serializes publishing in both cases.
+    if (batch.source !== "websub_test" && runs.some(run => typeof run.status === "string" && ACTIVE_RUNS.has(run.status))) {
       await this.change(data => { data.retryAt = Date.now() + 30_000; });
       log("github_deferred", { reason: "workflow_active", batch_id: batch.id }); return;
     }

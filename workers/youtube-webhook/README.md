@@ -65,7 +65,7 @@ Configuração preparada:
 - Custom Domain exato `hooks.ozecaoo.com`; callback `https://hooks.ozecaoo.com/youtube`.
 - Um DO `ChannelCoordinator`, migration SQLite `v1`.
 - Cron de manutenção `23 */6 * * *` em UTC.
-- `DISPATCH_ENABLED=false` na preparação: nenhuma chamada ao GitHub é feita com o gate fechado.
+- `DISPATCH_ENABLED=false` durante a preparação; a instalação autorizada está com `true`. Nenhuma chamada ao GitHub é feita com o gate fechado.
 - Inscrição inicialmente desativada; o Cron não solicita uma assinatura até o comando administrativo `subscribe`.
 
 Antes da publicação, o preflight conferiu zona ativa, ausência de domínio/rotas de Worker conflitantes e inexistência desse script. O OAuth não permitiu listar registros DNS internos (HTTP 403); a resolução pública de A/AAAA/CNAME para `hooks` retornou NXDOMAIN. O deploy não deve forçar remoção/substituição de um registro conflitante se o Wrangler encontrar algum. Apex, `www`, Pages e outros DNS ficam fora do escopo. Nenhum registro foi alterado na preparação.
@@ -90,7 +90,7 @@ O tópico WebSub é o endereço documentado pelo YouTube, com `/xml` e o Channel
 
 Ele difere do Atom de polling usado pelo Python. Não remover a query por seguir cegamente um `rel=self` incompleto. O hub HTTPS fixo é `https://pubsubhubbub.appspot.com/`. Pedidos incluem modo, tópico, callback, HMAC secret, `hub.verify=async`, token aleatório de verificação e lease solicitado de dez dias. O prazo real recebido no desafio é a referência. ACK 2xx não significa assinatura ativa.
 
-GET de verificação exige tópico/modo corretos, parâmetros válidos e nonce de um pedido pendente por até dez minutos. Responde somente o challenge, com `nosniff` e sem cache. Retransmissão do mesmo desafio é idempotente e não estende o lease. A compatibilidade de `hub.verify_token`, tópico e prazo efetivo será conferida na inscrição real, não presumida por testes simulados.
+GET de verificação exige tópico/modo corretos, parâmetros válidos e nonce de um pedido pendente por até dez minutos. Responde somente o challenge, com `nosniff` e sem cache. Retransmissão do mesmo desafio é idempotente e não estende o lease. A inscrição real de 4 de novembro de 2026 confirmou o tópico, `hub.verify_token` e lease de dez dias; os testes simulados continuam cobrindo falhas e renovação.
 
 POST exige `X-Hub-Signature` válido, HMAC-SHA1 (compatibilidade Google) ou SHA256 sobre os bytes originais. Sem assinatura não há fila nem disparo. XML passa por limite de 64 KiB, namespaces Atom/YouTube exatos, limite de profundidade/entradas/campos, rejeição de DTD/ENTITY e validação de canal/IDs/datas. Não se consulta nenhuma URL indicada pelo XML. Tombstones explícitos são ignorados e a reconciliação periódica cuida de disponibilidade.
 
@@ -104,13 +104,15 @@ Endpoints administrativos exigem `Authorization: Bearer <ADMIN_TOKEN>`. Sem cred
 - Até 2.000 versões conhecidas e 200 vídeos pendentes, com persistência transacional. Falta de espaço/armazenamento gera erro em vez de ACK com perda.
 - Debounce de 30 segundos; versões novas de um mesmo vídeo substituem sua versão pendente sem apagar outros vídeos.
 - Cooldown de dois minutos e até doze disparos por hora. O excedente é adiado, não descartado. Um lote reúne até cinquenta IDs.
-- Execução GitHub já ativa adia o lote, sem cancelar workflows em andamento. Fontes de teste controlado e WebSub permanecem separadas.
+- Execução GitHub já ativa adia os eventos automáticos, sem cancelar workflows em andamento. Um teste administrativo explicitamente autorizado pode entrar na fila mesmo assim; a concorrência `pages` do GitHub continua serializando a publicação. Fontes de teste controlado e WebSub permanecem separadas.
 - Edições de metadados que já estejam refletidas nos cards ou não afetem os dois vídeos visíveis podem ser ignoradas por comparação best-effort com o JSON público. Sem referência válida, o evento é mantido.
 - Cada lote tem UUID persistente no input e `run-name` do workflow. Uma intenção de envio é salva antes da chamada externa.
 
 O dispatch usa `workflow_dispatch` no `deploy.yml`, branch `main`; o token só precisa de Actions: write. São aceitos HTTP 200 ou 204. Erros de autenticação bloqueiam tentativas em loop até manutenção/credencial corrigida; rede, 429/5xx e limites de taxa têm retries duráveis com backoff. Em resposta ambígua, consulta runs pelo batch ID e espera propagação antes de repetir.
 
 Não é possível prometer exactly-once absoluto entre armazenamento da Cloudflare e uma API externa: uma resposta perdida após aceitação pode permanecer ambígua. O outbox, a consulta ao GitHub e os limites reduzem esse risco; não se marca entregue antes de confirmação. O UUID permite investigar eventuais duplicatas.
+
+A consulta de recuperação lê os dez runs mais recentes, com resposta limitada a 512 KB durante a leitura. Muitos disparos externos podem encobrir um lote ambíguo nessa janela. Respostas inválidas ou grandes demais preservam o lote e usam retry, sem liberar um disparo às cegas. Requests autenticados usam redirecionamento manual, sem encaminhar a credencial a outro destino.
 
 ## Renovação, saúde e recuperação
 
@@ -147,8 +149,20 @@ O Step Summary diferencia `schedule`, `manual`, `websub` e `websub_test`. IDs an
 
 O YouTube documenta upload e alterações de título/descrição. Não garante notificar início/fim de live ou momento exato de disponibilização da gravação. Não há promessa de atualização instantânea desses estados. Por isso, manter a reconciliação a cada seis horas é prudente para esse canal; reduzir para duas execuções diárias pode deixar gravações de lives até doze horas sem descoberta. Monitoramento dedicado de AO VIVO é uma evolução separada.
 
+| Situação | Cobertura e comportamento |
+| --- | --- |
+| Novo upload | Evento documentado pelo YouTube; o Worker agenda a consulta e a API confirma a elegibilidade. |
+| Vídeo publicado | Uploads públicos podem atualizar o site por evento; não há garantia documentada para toda transição de privacidade/publicação. A reconciliação cobre ausências. |
+| Título/descrição alterados | Ambos são documentados; mudanças apenas na descrição não disparam rebuild, pois os cards não a exibem. |
+| Live agendada | Pode gerar entrada no feed, sem garantia específica. O Python exclui conteúdo ainda indisponível. |
+| Live iniciada | WebSub não garante esse sinal; o site não é um indicador de AO VIVO. |
+| Live encerrada | WebSub não garante esse sinal; a reconciliação consulta o estado na API. |
+| Gravação disponibilizada | A API valida a gravação disponível. Sem evento, a descoberta aguarda reconciliação ou execução manual. |
+
+Resultados da instalação e links de execuções: [validação de 4 de novembro de 2026](../../docs/websub-validation-2026-11-04.md).
+
 ## Custos e limites
 
-Compatível com Workers Free: 100 mil requisições/dia, 10 ms de CPU por invocação HTTP/Cron, 50 subrequests e até cinco Cron Triggers por conta. DO SQLite Free: 100 mil requisições/dia (inclui alarmes), 13 mil GB-s/dia, 5 GB de armazenamento, cinco milhões de linhas lidas e cem mil escritas por dia. Esses limites são compartilhados com outros usos da conta. Excesso no Free falha; não ativa automaticamente um plano pago. Nenhum serviço com cobrança foi habilitado nesta preparação.
+Compatível com Workers Free: 100 mil requisições/dia, 10 ms de CPU por invocação HTTP/Cron, 50 subrequests e até cinco Cron Triggers por conta. DO SQLite Free: 100 mil requisições/dia (inclui alarmes), 13 mil GB-s/dia, 5 GB de armazenamento, cinco milhões de linhas lidas e cem mil escritas por dia. Esses limites são compartilhados com outros usos da conta. Excesso no Free falha; não ativa automaticamente um plano pago. Nenhum plano pago foi habilitado na instalação.
 
 Referências oficiais: [YouTube WebSub](https://developers.google.com/youtube/data/guides/push_notifications), [hub Google](https://pubsubhubbub.appspot.com/), [HMAC PubSubHubbub 0.4](https://pubsubhubbub.github.io/PubSubHubbub/pubsubhubbub-core-0.4.html#authednotify), [WebSub](https://www.w3.org/TR/websub/), [KV e consistência eventual](https://developers.cloudflare.com/kv/concepts/how-kv-works/), [DO pricing](https://developers.cloudflare.com/durable-objects/platform/pricing/), [Workers limits](https://developers.cloudflare.com/workers/platform/limits/), [Custom Domains](https://developers.cloudflare.com/workers/configuration/routing/custom-domains/), [workflow_dispatch e token](https://docs.github.com/en/rest/actions/workflows#create-a-workflow-dispatch-event).
