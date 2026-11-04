@@ -92,9 +92,9 @@ python3 scripts/build_site.py --feed data/videos.json
 python3 -m http.server 8000 --bind 127.0.0.1 --directory dist
 ```
 
-## Validação real após aprovação
+## Validação realizada
 
-Não foi disponibilizada uma chave ao ambiente local; a credencial permanece no repository secret. Os testes locais não demonstram sucesso da integração autenticada. Esta alteração será submetida à aprovação antes de commit, push ou deploy.
+Não foi disponibilizada uma chave ao ambiente local; a credencial permanece no repository secret. Após aprovação explícita, o commit `8ffcd49` foi enviado e a integração autenticada foi validada no [run 41867212276](https://github.com/vlopcas/oZECAOo/actions/runs/41867212276). A evidência real complementa os testes locais com mocks.
 
 Validação local realizada em 04/11/2026:
 
@@ -106,9 +106,13 @@ Validação local realizada em 04/11/2026:
 | Recuperação do JSON público real | HTTP 200; canal e dois IDs válidos; última sincronização desconhecida no cache legado. |
 | Build com esse JSON real | Dois cards, IDs compatíveis; scripts Python internos fora dos artefatos. |
 | Segurança | Chave sentinela ausente dos logs, relatório e de todos os artefatos públicos do teste integrado; redirects autenticados bloqueados. |
-| Consulta autenticada real / nova publicação | **Pendente de aprovação e execução no Actions.** Nenhum commit, push, deploy ou disparo de workflow foi feito nesta etapa. |
+| Consulta autenticada real | **UPDATED**, fonte **youtube_data_api_v3**, em 04/11/2026 às 16:28:14 UTC (13:28:14 em Brasília). Sem fallback na etapa de sincronização. |
+| Build, Pages e resumo final | **success** no mesmo run; os 89 testes também passaram no Actions. |
+| Seleção real | `YIgeTMh2cp0` (Titanfall 2, vídeo publicado) e `HWXZF5rBk1o` (The Witcher 3, live encerrada). Comparação independente com as abas públicas `/videos` e `/streams` do canal. Trailer excluído. |
+| Artefato e site público | 26 arquivos auditados. JSON/HTML com os mesmos dois IDs; JSON público com SHA-256 idêntico ao artefato: `ee8ec2232eb06ff7c642f0e315644fb7f80489e2adbbe13e7fd8ea588a3c3117`. |
+| Varredura pública | Nenhum padrão de chave Google, variável do secret ou cabeçalho autenticado nos 26 arquivos do artefato e nos quatro scripts públicos. Scripts Python internos ausentes. |
 
-Após aprovação e publicação do código na branch principal:
+Para verificar as próximas execuções:
 
 1. Em **Actions → ZECAO • Atualização do YouTube e publicação**, use **Run workflow** na `main` ou acompanhe a execução do push aprovado.
 2. Confira **`UPDATED` + `youtube_data_api_v3`** no Step Summary. Isso deve comprovar consulta ao canal configurado, descoberta da uploads, validação dos recursos e seleção; `PRESERVED` ainda indica um problema de atualização.
@@ -116,7 +120,7 @@ Após aprovação e publicação do código na branch principal:
 4. Confira build e deploy como `success`. Abra [o JSON público](https://ozecaoo.com/data/videos.json), verifique `source`, `sync` e os mesmos IDs no HTML da [home](https://ozecaoo.com/).
 5. Inspecione os logs e o artefato de Pages sem revelar o secret. Nenhum valor de credencial deve estar no HTML, JS, JSON ou relatório público.
 
-O secret já está configurado; não é necessário criar outra chave ou credencial. A execução real autenticada é a validação pendente antes de declarar a integração operacionalmente corrigida.
+O secret já está configurado e funcionou na execução real; não há configuração manual de credenciais pendente. As limitações operacionais abaixo continuam aplicáveis a futuras indisponibilidades do provedor.
 
 ## Diagnóstico operacional e limitações
 
