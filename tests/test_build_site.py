@@ -185,6 +185,53 @@ class BuildSiteTests(unittest.TestCase):
         self.assertEqual(first, self.tree(output))
         self.assertNotIn("lastmod", (output / "sitemap.xml").read_text())
 
+    def test_api_source_and_allowlisted_sync_metadata_survive_the_build(self):
+        metadata = {"state": "UPDATED", "attempted_at": "2026-11-04T12:00:00Z",
+                    "last_success_at": "2026-11-04T12:00:00Z",
+                    "last_success_source": "youtube_data_api_v3", "api_key": "dummy-private-field"}
+        self.write_feed([self.video(1), self.video(2)], source="youtube_data_api_v3", sync=metadata,
+                        api_key="dummy-private-field", raw_response={"key": "dummy-private-field"})
+        output = self.build()
+        feed = json.loads((output / "data/videos.json").read_text())
+        self.assertEqual(feed["source"], "youtube_data_api_v3")
+        self.assertEqual(set(feed["sync"]), {"state", "attempted_at", "last_success_at", "last_success_source"})
+        self.assertEqual(feed["sync"]["last_success_at"], "2026-11-04T12:00:00+00:00")
+        self.assertNotIn("dummy-private-field", "\n".join(path.read_text() for path in output.rglob("*")
+                                                        if path.is_file() and path.suffix in (".html", ".json", ".js")))
+
+    def test_attempt_changes_only_sync_json_without_changing_html_or_sitemap(self):
+        metadata = {"state": "PRESERVED", "attempted_at": "2026-11-04T12:00:00Z",
+                    "last_success_at": "2026-11-01T12:00:00Z", "last_success_source": "youtube_atom"}
+        self.write_feed([self.video(1), self.video(2)], source="published_cache", sync=metadata)
+        output = self.build()
+        before = self.tree(output)
+        metadata["attempted_at"] = "2026-11-05T12:00:00Z"
+        self.write_feed([self.video(1), self.video(2)], source="published_cache", sync=metadata)
+        self.build()
+        after = self.tree(output)
+        self.assertNotEqual(before.pop("data/videos.json"), after.pop("data/videos.json"))
+        self.assertEqual(before, after)
+        feed = json.loads((output / "data/videos.json").read_text())
+        self.assertEqual(feed["sync"]["last_success_at"], "2026-11-01T12:00:00+00:00")
+
+    def test_preserved_legacy_cache_keeps_unknown_success_date(self):
+        self.write_feed([self.video(1), self.video(2)], source="published_cache",
+                        sync={"state": "PRESERVED", "attempted_at": "2026-11-04T12:00:00Z",
+                              "last_success_at": None, "last_success_source": None})
+        output = self.build()
+        feed = json.loads((output / "data/videos.json").read_text())
+        self.assertIsNone(feed["sync"]["last_success_at"])
+        self.assertEqual(feed["sync"]["state"], "PRESERVED")
+
+    def test_live_sort_date_does_not_replace_publication_date(self):
+        live = {**self.video(1), "type": "LIVE GRAVADA", "sort_at": "2026-11-04T12:00:00Z"}
+        self.write_feed([live, self.video(2)], source="youtube_data_api_v3")
+        output = self.build()
+        feed = json.loads((output / "data/videos.json").read_text())
+        self.assertEqual(feed["videos"][0]["published"], "2026-10-10T01:00:00+00:00")
+        self.assertEqual(feed["videos"][0]["sort_at"], "2026-11-04T12:00:00+00:00")
+        self.assertIn("09/10/2026", self.read_html())
+
     def test_css_and_scripts_use_content_versions_without_renaming_assets(self):
         output = self.build()
         versions = self.asset_versions()

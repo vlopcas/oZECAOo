@@ -104,6 +104,14 @@ def normalized_videos(items, limit: int, excluded_id: str = "") -> list[dict]:
                     video["published"] = parsed.astimezone(timezone.utc).isoformat(timespec="seconds")
             except (ValueError, OverflowError):
                 pass
+        sort_at = item.get("sort_at")
+        if isinstance(sort_at, str):
+            try:
+                parsed = datetime.fromisoformat(sort_at.replace("Z", "+00:00"))
+                if parsed.tzinfo is not None:
+                    video["sort_at"] = parsed.astimezone(timezone.utc).isoformat(timespec="seconds")
+            except (ValueError, OverflowError):
+                pass
         thumbnail = item.get("thumbnail")
         if isinstance(thumbnail, str):
             try:
@@ -181,9 +189,29 @@ def load_feed(path: Path, cfg: dict) -> dict:
         source = "configured_fallback"
     else:
         supplied_source = feed.get("source")
-        source = supplied_source if supplied_source in ("youtube_atom", "configured_fallback") else "youtube_atom"
-    # Poll timestamps are intentionally excluded: unchanged content builds identically.
-    return {"source": source, "channel_id": cfg["youtubeChannelId"], "videos": items}
+        source = supplied_source if supplied_source in ("youtube_data_api_v3", "youtube_atom", "published_cache", "configured_fallback") else "youtube_atom"
+    result = {"source": source, "channel_id": cfg["youtubeChannelId"], "videos": items}
+    # Only allowlisted synchronization metadata is public. Legacy poll timestamps
+    # remain ignored; a missing last_success_at must never become the build time.
+    supplied_sync = feed.get("sync") if isinstance(feed, dict) and not wrong_channel else None
+    if source != "configured_fallback" and isinstance(supplied_sync, dict):
+        state = supplied_sync.get("state")
+        if state in ("UPDATED", "PRESERVED"):
+            metadata = {"state": state}
+            for key in ("attempted_at", "last_success_at"):
+                value = supplied_sync.get(key)
+                metadata[key] = None
+                if isinstance(value, str):
+                    try:
+                        parsed = datetime.fromisoformat(value.replace("Z", "+00:00"))
+                        if parsed.tzinfo is not None:
+                            metadata[key] = parsed.astimezone(timezone.utc).isoformat(timespec="seconds")
+                    except (ValueError, OverflowError):
+                        pass
+            previous_source = supplied_sync.get("last_success_source")
+            metadata["last_success_source"] = previous_source if previous_source in ("youtube_data_api_v3", "youtube_atom") else None
+            result["sync"] = metadata
+    return result
 
 
 def seo_markup(cfg: dict) -> str:

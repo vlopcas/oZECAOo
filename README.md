@@ -17,7 +17,7 @@ python3 -m http.server 8000 --bind 127.0.0.1 --directory dist
 
 Abra **http://localhost:8000**. Para parar o servidor, use `Ctrl+C`. Depois de editar a configuração ou os arquivos do site, execute o build novamente. Sirva `dist/`: o `index.html` da raiz é o modelo usado pelo gerador, não a versão final publicada.
 
-A consulta ao YouTube gera `dist/data/videos.json`. Os arquivos gerados em `dist/` ficam ignorados pelo Git; nenhum comando acima atualiza o JSON de reserva versionado. Para um teste sem rede, passe `--fixture caminho/feed.xml` ao atualizador. Ele também aceita `--config caminho/site.config.json` e `--output caminho/videos.json`.
+A consulta ao YouTube gera `dist/data/videos.json`. Os arquivos gerados em `dist/` ficam ignorados pelo Git; nenhum comando acima atualiza o JSON de reserva versionado. A chave da API fica exclusivamente no secret do Actions; sem ela, a prévia local pode usar as reservas existentes. Para um teste sem rede, passe `--fixture caminho/feed.xml` ao atualizador. Ele também aceita `--config caminho/site.config.json`, `--output caminho/videos.json` e `--report caminho/relatorio.json` (fora de `dist/`).
 
 ## Configuração e conteúdo
 
@@ -33,7 +33,9 @@ A consulta ao YouTube gera `dist/data/videos.json`. Os arquivos gerados em `dist
 
 - `index.html`: estrutura e modelo do conteúdo; os campos de identidade e SEO são preenchidos no build.
 - `styles.css`: cores, composição, responsividade e animações.
-- `script.js`: player, thumbnails e atualização dos cards no navegador.
+- `script.js`: player, thumbnails e leitura do JSON público, sem credenciais ou chamadas autenticadas no navegador.
+- `scripts/youtube_api.py`: descoberta pela API v3, validação de vídeos/lives e erros sem credenciais.
+- `scripts/report_sync.py`: resumo dos estados de sincronização, build e publicação no Actions.
 - `navigation.js`: menu mobile com os links do desktop e fechamento por seleção, clique fora ou Escape.
 - `instagram.js`: carregamento da prévia oficial do perfil e ajuste de altura pelas mensagens do Instagram.
 - `assets/`: artes e ícones oficiais, usados também pelo manifest gerado.
@@ -59,21 +61,23 @@ Se o Instagram não enviar uma medida válida em 12 segundos, a caixa da prévia
 
 ## Atualização dos vídeos e build
 
-O workflow `.github/workflows/deploy.yml` executa em pushes para `main`, manualmente e quatro vezes ao dia. A ordem é **testes → consulta do Atom → build em `dist/` → publicação**.
+O workflow `.github/workflows/deploy.yml` executa em pushes para `main`, manualmente e quatro vezes ao dia. A ordem é **testes → sincronização YouTube → build em `dist/` → publicação → resumo**, com o resumo também executado em falhas.
 
-O atualizador consulta o Atom público do canal e seleciona somente as **2 publicações mais recentes**, sem acumular o histórico. Em falhas da consulta, faz até três tentativas com pequenas pausas. O vídeo fixo de apresentação é excluído antes da seleção, sem ocupar uma dessas duas vagas. O JSON gerado, os cards no HTML publicado e o navegador usam esse mesmo limite. Títulos e links podem ser lidos mesmo com JavaScript desabilitado; o navegador mantém as interações e os fallbacks das imagens sem substituir inicialmente os cards atuais por reservas antigas.
+O atualizador usa **YouTube Data API v3 → Atom com validação pela API → último JSON publicado**. O secret existente **`YOUTUBE_API_KEY`** é passado apenas ao Python na etapa de sincronização. Não há OAuth, backend ou dependências externas. Somente os **2 vídeos públicos elegíveis mais recentes** são selecionados, excluindo o trailer, duplicatas, privados, indisponíveis, lives futuras e em andamento. Lives encerradas precisam ter gravação processada e metadados válidos. O HTML continua com os mesmos cards e pode ser lido sem JavaScript.
 
-As thumbnails priorizam WebP/JPG de alta resolução quando disponíveis; depois tentam SD, HQ e a arte local. A atualização não faz uma requisição adicional por vídeo. O Atom mistura vídeos, lives e Shorts e não informa seu formato com precisão, por isso os itens do feed usam a indicação genérica “NO YOUTUBE”.
+O fluxo principal usa `channels.list`, `playlistItems.list` paginado e `videos.list` em lotes; não usa `search.list`. A ordenação é explícita: publicação para vídeos comuns; máximo entre publicação e encerramento para lives gravadas. A data original de publicação permanece no card. As thumbnails mantêm a seleção WebP/JPG de alta resolução e os fallbacks já existentes.
 
-No Actions, o comando usa **`--preserve-published`**. Se as tentativas ao YouTube falharem, recupera o JSON do último site publicado em `siteUrl` + `videosFeedPath`, valida o canal e os vídeos e preserva essa seleção, sem inventar uma data de atualização. A falha gera um aviso visível no Actions. Se o feed publicado também estiver indisponível ou inválido, o job falha antes do build e mantém o deploy anterior no ar. A produção não substitui os vídeos publicados pela reserva antiga do repositório durante uma falha de consulta.
+No Actions, o comando usa **`--preserve-published`** e grava um relatório em `runner.temp`, fora dos artefatos públicos. O JSON publicado é validado e usado como referência para revalidar os IDs anteriores. Se as fontes falharem, ele é preservado; se não houver recuperação válida, o job para antes do build e mantém o site anterior. O Atom sozinho não confirma que uma live terminou: sem validação de disponibilidade pela API, a produção preserva os vídeos anteriores, conforme a política conservadora escolhida.
+
+O **Step Summary** distingue **`UPDATED`** (consulta concluída, mesmo sem vídeo novo), **`PRESERVED`** (cache mantido, aviso explícito) e **`FAILED`** (sem fonte válida, publicação bloqueada). Exibe fonte, vídeos, horário da tentativa, última consulta bem-sucedida, idade do cache e resultados independentes de build/deploy. O build preserva esses metadados no JSON sem alterar a aparência da página. O cache legado sem data de sincronização tem idade **desconhecida**; preservar não renova essa data.
 
 Na prévia local, sem essa opção, o atualizador continua usando as reservas nesta ordem: JSON gerado existente válido do mesmo canal; `data/videos.json` versionado válido do mesmo canal; `fallbackVideos` válidos da configuração. Elas também excluem a apresentação e ficam limitadas a dois vídeos. Se nenhuma reserva for válida, a execução falha sem publicar JSON malformado. O modo `--fixture` usa somente arquivos locais, sem consultas de rede.
 
-A atualização não é em tempo real e os agendamentos podem atrasar. O GitHub pode desativar agendamentos de repositórios públicos após 60 dias sem atividade. O build não usa a hora da consulta do feed como uma alteração da página.
+A atualização não é em tempo real e os agendamentos podem atrasar. O horário de tentativa/sincronização não é usado como alteração da página ou `lastmod` do sitemap. Consulte o [guia da integração YouTube](docs/youtube-integration.md) para seleção, limites, quota, erros, diagnóstico e validação real após aprovação.
 
 ## Domínio e publicação
 
-O repositório é **`vlopcas/oZECAOo`**, a branch principal é `main` e a origem do Pages é **GitHub Actions**. Após commit e push, acompanhe **Actions → ZECAO • Atualização do YouTube e publicação**; a execução também pode ser iniciada em **Run workflow**. Não são necessários secrets para o feed público.
+O repositório é **`vlopcas/oZECAOo`**, a branch principal é `main` e a origem do Pages é **GitHub Actions**. Após aprovação, commit e push, acompanhe **Actions → ZECAO • Atualização do YouTube e publicação**; a execução também pode ser iniciada em **Run workflow**. A fonte principal usa o repository secret **`YOUTUBE_API_KEY`**, já configurado; o valor nunca é incluído no site.
 
 A configuração do domínio vale apenas para este repositório. Preserve `vlopcas.dev`, seus subdomínios e os demais projetos.
 

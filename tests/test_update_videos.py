@@ -79,6 +79,9 @@ class UpdateVideosTests(unittest.TestCase):
         sleep_patcher = patch.object(updater.time, "sleep")
         self.mock_sleep = sleep_patcher.start()
         self.addCleanup(sleep_patcher.stop)
+        environment = patch.dict(updater.os.environ, {"YOUTUBE_API_KEY": ""})
+        environment.start()
+        self.addCleanup(environment.stop)
 
     def save_config(self):
         self.config_path.write_text(json.dumps(self.config), encoding="utf-8")
@@ -98,20 +101,18 @@ class UpdateVideosTests(unittest.TestCase):
         self.save_config()
         body = atom([(TRAILER_ID, "Apresentação"), *[(f"ID{number:09}", f"Vídeo {number}") for number in range(4)]])
         with patch.object(updater.urllib.request, "urlopen", return_value=io.BytesIO(body)) as urlopen:
-            self.assertEqual(self.run_update(), 0)
+            videos = updater.fetch_videos(OTHER_CHANNEL_ID, 2, TRAILER_ID)
         self.assertEqual(urlopen.call_args.args[0].full_url,
                          f"https://www.youtube.com/feeds/videos.xml?channel_id={OTHER_CHANNEL_ID}")
-        generated = json.loads(self.output.read_text())
-        self.assertEqual(generated["channel_id"], OTHER_CHANNEL_ID)
-        self.assertEqual(len(generated["videos"]), 2)
-        self.assertEqual([item["id"] for item in generated["videos"]], ["ID000000000", "ID000000001"])
+        self.assertEqual([item["id"] for item in videos], ["ID000000000", "ID000000001"])
 
     def test_default_limit_is_two_when_omitted_from_config(self):
         self.config.pop("maxFeedVideos")
         self.save_config()
         body = atom([(f"ID{number:09}", f"Vídeo {number}") for number in range(5)])
-        with patch.object(updater.urllib.request, "urlopen", return_value=io.BytesIO(body)):
-            self.assertEqual(self.run_update(), 0)
+        fixture = self.root / "fixture.xml"
+        fixture.write_bytes(body)
+        self.assertEqual(self.run_update("--fixture", str(fixture)), 0)
         self.assertEqual(len(json.loads(self.output.read_text())["videos"]), 2)
 
     def test_fixture_writes_only_generated_output(self):
@@ -226,21 +227,21 @@ class UpdateVideosTests(unittest.TestCase):
                                          "Not Found", None, None)
         body = atom([("ID000000001", "Recente"), ("ID000000002", "Anterior")])
         with patch.object(updater.urllib.request, "urlopen", side_effect=[missing, io.BytesIO(body)]) as urlopen:
-            self.assertEqual(self.run_update("--preserve-published"), 0)
+            videos = updater.fetch_videos(CHANNEL_ID, 2, TRAILER_ID)
         self.assertEqual(urlopen.call_count, 2)
         self.mock_sleep.assert_called_once_with(1)
         self.assertTrue(all("youtube.com/feeds/videos.xml" in call.args[0].full_url
                             for call in urlopen.call_args_list))
-        self.assertEqual([item["id"] for item in json.loads(self.output.read_text())["videos"]],
+        self.assertEqual([item["id"] for item in videos],
                          ["ID000000001", "ID000000002"])
 
     def test_invalid_or_empty_atom_is_retried(self):
         bodies = [b"<broken>", atom([]), atom([("ID000000001", "Novo")])]
         with patch.object(updater.urllib.request, "urlopen", side_effect=[io.BytesIO(body) for body in bodies]) as urlopen:
-            self.assertEqual(self.run_update(), 0)
+            videos = updater.fetch_videos(CHANNEL_ID, 2, TRAILER_ID)
         self.assertEqual(urlopen.call_count, 3)
         self.assertEqual([call.args for call in self.mock_sleep.call_args_list], [(1,), (2,)])
-        self.assertEqual(json.loads(self.output.read_text())["videos"][0]["id"], "ID000000001")
+        self.assertEqual(videos[0]["id"], "ID000000001")
 
     def test_preserves_published_feed_in_clean_runner_instead_of_old_versioned_reserve(self):
         self.write_cache(self.versioned, [video("ID000000000", "Reserva antiga")])
@@ -252,17 +253,18 @@ class UpdateVideosTests(unittest.TestCase):
                               video("ID000000002", "Segundo recente"),
                               video("ID000000003", "Terceiro")]}
         offline = urllib.error.URLError("offline")
-        responses = [offline, offline, offline, io.BytesIO(json.dumps(payload).encode())]
+        responses = [io.BytesIO(json.dumps(payload).encode()), offline, offline, offline]
         with patch.object(updater.urllib.request, "urlopen", side_effect=responses) as urlopen:
             self.assertEqual(self.run_update("--preserve-published"), 0)
         self.assertEqual(urlopen.call_count, 4)
-        self.assertEqual(urlopen.call_args.args[0].full_url, "https://ozecaoo.com/data/videos.json")
+        self.assertEqual(urlopen.call_args_list[0].args[0].full_url, "https://ozecaoo.com/data/videos.json")
         self.assertEqual(urlopen.call_args.kwargs["timeout"], 15)
         generated = json.loads(self.output.read_text())
         self.assertEqual([item["id"] for item in generated["videos"]], ["ID000000001", "ID000000002"])
         self.assertEqual(generated["videos"][0]["title"], "<Novo> & recente")
         self.assertEqual(generated["updated_at"], payload["updated_at"])
-        self.assertEqual(generated["source"], "youtube_atom")
+        self.assertEqual(generated["source"], "published_cache")
+        self.assertEqual(generated["sync"]["state"], "PRESERVED")
         self.assertEqual(self.versioned.read_bytes(), original_reserve)
 
     def test_published_recovery_failure_never_changes_output_or_uses_old_reserves(self):
@@ -286,7 +288,7 @@ class UpdateVideosTests(unittest.TestCase):
                         self.write_cache(self.output, [video("ID000000001", "Já gerado")])
                     original = self.output.read_bytes() if self.output.exists() else None
                     response = invalid if isinstance(invalid, Exception) else io.BytesIO(invalid)
-                    with patch.object(updater.urllib.request, "urlopen", side_effect=[offline] * 3 + [response]):
+                    with patch.object(updater.urllib.request, "urlopen", side_effect=[response] + [offline] * 3):
                         self.assertEqual(self.run_update("--preserve-published"), 1)
                     if existing_output:
                         self.assertEqual(self.output.read_bytes(), original)
