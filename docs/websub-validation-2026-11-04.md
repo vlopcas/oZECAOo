@@ -49,11 +49,15 @@ Foi criado um único lote administrativo `websub_test`, com os dois IDs já publ
 - GitHub aceitou o dispatch às 14:34:30 de Brasília.
 - [Execução controlada 41878656335](https://github.com/vlopcas/oZECAOo/actions/runs/41878656335), com origem e UUID no título.
 - Estado do Worker após aceitação: zero pendentes e lote encerrado; nenhuma segunda chamada de teste foi necessária.
-- A execução mudou de `queued` para `waiting`, sem runner nem steps iniciados, na última conferência. Python, atualização do JSON e Pages deste teste ainda dependem da conclusão dessa execução. Não se considera o teste ponta a ponta concluído só pela aceitação do dispatch.
+- **Teste ponta a ponta concluído com sucesso.** Os logs vinculam `workflow_dispatch`, origem `websub_test` e o UUID acima à execução do Python: 92 testes aprovados, API v3 `UPDATED` com dois vídeos, build e deploy bem-sucedidos.
+- Consulta da API às 14:46:30 de Brasília; o `deploy-pages` informou `Reported success!` às 14:47:01.
+- Artefato `github-pages` de ID `13347429549`, criado às 14:46:34. O JSON e o HTML públicos tiveram `Last-Modified` às 14:46:51; o JSON confirma fonte `youtube_data_api_v3`, estado `UPDATED`, sincronização às 14:46:30 e os mesmos dois IDs. Assim, a conclusão não depende apenas do status verde do Actions.
 
 Às 14:40 de Brasília, o GitHub abriu um [incidente de indisponibilidade parcial do Actions](https://www.githubstatus.com/incidents/h02n9572mx9y). A API também mostrou atualizações tardias de estado: uma checagem com todos os passos concluídos permaneceu em andamento por vários minutos, e o cancelamento de uma publicação anterior só apareceu depois. O cancelamento forçado dessa publicação foi recusado com HTTP 409. Esse cenário é compatível com a [situação de runs fora de sincronia documentada pelo GitHub](https://docs.github.com/en/actions/how-tos/troubleshoot-workflows#canceling-workflows), sem provar a causa específica do teste pendente.
 
-O ambiente `github-pages` permite a branch `main`, sem revisores obrigatórios, temporizador ou regras de proteção personalizadas. Não foi identificada aprovação manual acionável; as configurações do ambiente foram preservadas. O checkpoint final usa `[skip ci]` somente na mensagem desse commit para não criar outra publicação que substitua o teste pendente no grupo `pages`. O código final já está publicado no Worker e passou nos 64 testes locais. O cron, as execuções manuais e os próximos pushes continuam habilitados normalmente.
+O ambiente `github-pages` permite a branch `main`, sem revisores obrigatórios, temporizador ou regras de proteção personalizadas. Não foi identificada aprovação manual acionável; as configurações do ambiente foram preservadas. Mesmo depois da conclusão, o endpoint de jobs ainda mostrava passos vazios, enquanto logs, artefato e página pública já confirmavam a publicação.
+
+O checkpoint de código `44bb86d` usou `[skip ci]` na mensagem para não substituir o teste ainda pendente no grupo `pages` naquele momento; o complemento documental também dispensa uma nova publicação. O código final já está publicado no Worker e passou nos 64 testes locais. O cron, as execuções manuais e os próximos pushes continuam habilitados normalmente.
 
 ## Limitações e acompanhamento
 
