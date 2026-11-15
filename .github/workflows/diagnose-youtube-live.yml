@@ -1,0 +1,104 @@
+name: Diagnóstico manual de gravação do YouTube
+
+on:
+  workflow_dispatch:
+    inputs:
+      video_id:
+        description: ID público para investigar, sem publicar o site
+        required: true
+        type: string
+        default: bYh315u3yhs
+
+permissions:
+  contents: read
+
+jobs:
+  diagnose:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@v7
+      - name: Consultar metadados e explicar a seleção, sem deploy
+        env:
+          YOUTUBE_API_KEY: ${{ secrets.YOUTUBE_API_KEY }}
+          DIAGNOSTIC_VIDEO_ID: ${{ inputs.video_id }}
+        run: |
+          python3 - <<'PY'
+          import datetime as dt
+          import json
+          import os
+          import sys
+          from pathlib import Path
+
+          sys.path.insert(0, str(Path('scripts').resolve()))
+          import youtube_api as api
+
+          cfg = json.loads(Path('site.config.json').read_text())
+          channel = cfg['youtubeChannelId']
+          trailer = cfg.get('trailerVideoId', '')
+          video_id = os.environ['DIAGNOSTIC_VIDEO_ID']
+          if not api.VIDEO_ID.fullmatch(video_id):
+              raise SystemExit('ID inválido')
+          key = os.environ.get('YOUTUBE_API_KEY', '')
+          now = dt.datetime.now(dt.timezone.utc)
+          result = {'observed_at': now.isoformat(), 'video_id': video_id}
+          uploads = []
+          original_request = api._request_json
+
+          def observe_request(api_key, endpoint, params):
+              payload = original_request(api_key, endpoint, params)
+              if endpoint == 'playlistItems':
+                  uploads.extend(item.get('contentDetails', {}).get('videoId')
+                                 for item in payload.get('items', []))
+              return payload
+
+          api._request_json = observe_request
+          try:
+              payload = original_request(key, 'videos', {
+                  'part': 'snippet,status,contentDetails,liveStreamingDetails',
+                  'id': video_id,
+              })
+              item = next((row for row in payload.get('items', [])
+                           if row.get('id') == video_id), None)
+              eligible = None
+              if item is None:
+                  result['target'] = {'returned_by_api': False}
+              else:
+                  snip = item.get('snippet', {})
+                  status = item.get('status', {})
+                  details = item.get('contentDetails', {})
+                  live = item.get('liveStreamingDetails', {})
+                  result['target'] = {
+                      'returned_by_api': True,
+                      'snippet': {k: snip.get(k) for k in (
+                          'channelId', 'title', 'publishedAt', 'liveBroadcastContent')},
+                      'status': {k: status.get(k) for k in (
+                          'privacyStatus', 'uploadStatus', 'embeddable')},
+                      'contentDetails': {k: details.get(k) for k in (
+                          'duration', 'regionRestriction')},
+                      'liveStreamingDetails': {k: live.get(k) for k in (
+                          'scheduledStartTime', 'actualStartTime', 'actualEndTime')},
+                  }
+                  eligible = api._eligible_video(item, channel, now)
+                  result['target']['eligible_by_current_code'] = eligible is not None
+              selected = api.fetch_recent_videos(
+                  key, channel, limit=2, excluded_id=trailer, now=now)
+              result['discovery'] = {
+                  'upload_ids_count': len(set(uploads)),
+                  'target_in_uploads': video_id in uploads,
+              }
+              result['production_selection'] = [
+                  {k: row.get(k) for k in ('id', 'title', 'type', 'published', 'sort_at')}
+                  for row in selected]
+              if eligible is not None:
+                  combined = {row['id']: row for row in selected + [eligible]}
+                  ordered = sorted(combined.values(), key=lambda row: (
+                      api._timestamp(row['sort_at']), row['id']), reverse=True)[:2]
+                  result['selection_including_target_id'] = [row['id'] for row in ordered]
+          except api.APIError as exc:
+              result['api_error'] = exc.reason
+          except (OSError, ValueError, KeyError, TypeError):
+              result['diagnostic_error'] = 'invalid_or_unavailable_response'
+
+          print(json.dumps(result, ensure_ascii=False, indent=2))
+          PY
