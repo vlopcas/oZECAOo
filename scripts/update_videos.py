@@ -222,19 +222,20 @@ def retrieve_published(url, channel_id, limit, trailer_id):
                              channel_id, limit, trailer_id)
 
 
-def atom_recordings(channel_id, limit, trailer_id, key, now, baseline, can_validate=True):
-    # Atom alone cannot prove that an announced live has finished.
+def atom_public_videos(channel_id, limit, trailer_id, key, now, baseline, can_validate=True):
+    # Atom alone cannot distinguish public broadcasts from ordinary uploads
+    # that have not finished processing; both need the same API validation.
     candidates = fetch_videos(channel_id, 50, trailer_id)
     if not key or not can_validate:
-        raise ValueError("Atom não confirma estado das lives; API indisponível para validar gravações")
+        raise ValueError("Atom não confirma elegibilidade; API indisponível para validar conteúdos públicos")
     ids = [v["id"] for v in candidates]
     if baseline:
         ids.extend(v["id"] for v in baseline["videos"])
-    recordings = youtube_api.fetch_video_details(key, channel_id, ids,
-                                                excluded_id=trailer_id, now=now)
-    if len(recordings) < limit:
-        raise ValueError("Atom sem gravações públicas confirmadas suficientes")
-    return recordings[:limit]
+    videos = youtube_api.fetch_video_details(key, channel_id, ids,
+                                            excluded_id=trailer_id, now=now)
+    if len(videos) < limit:
+        raise ValueError("Atom sem conteúdos públicos elegíveis suficientes")
+    return videos[:limit]
 
 
 def emit_result(args, state, source, channel_id, videos, attempted_at,
@@ -331,13 +332,13 @@ def main(argv=None):
             reasons.append(reason)
             warn(reason)
             try:
-                videos = atom_recordings(channel_id, limit, trailer_id, key, now, baseline,
-                                         getattr(exc, "can_validate_fallback", True))
+                videos = atom_public_videos(channel_id, limit, trailer_id, key, now, baseline,
+                                           getattr(exc, "can_validate_fallback", True))
                 source = "youtube_atom"
             except (*NETWORK_ERRORS, youtube_api.APIError) as atom_error:
                 if isinstance(atom_error, urllib.error.HTTPError):
                     atom_error.close()
-                reason = safe_text(f"Atom/validação de gravações: {atom_error}")
+                reason = safe_text(f"Atom/validação de conteúdos: {atom_error}")
                 reasons.append(reason)
                 warn(reason)
 

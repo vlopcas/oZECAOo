@@ -157,12 +157,129 @@ class YouTubeAPITests(unittest.TestCase):
             items.append(item)
         self.assertEqual(self.details(items, [item["id"] for item in items] + [video(100)["id"]]), [])
 
-    def test_live_and_scheduled_items_are_excluded_even_if_public_and_processed(self):
-        items = [video(1), video(2), video(3)]
-        items[0]["snippet"]["liveBroadcastContent"] = "live"
-        items[1]["snippet"]["liveBroadcastContent"] = "upcoming"
-        items[2]["liveStreamingDetails"] = {"scheduledStartTime": "2026-11-05T12:00:00Z"}
-        self.assertEqual(self.details(items), [])
+    def test_public_upcoming_and_running_lives_are_eligible_with_zero_duration(self):
+        for upload in ("uploaded", "processed"):
+            for state, live_details in (
+                ("upcoming", {"scheduledStartTime": "2026-11-05T12:00:00Z"}),
+                ("live", {"actualStartTime": "2026-11-04T11:00:00Z"}),
+            ):
+                with self.subTest(upload=upload, state=state):
+                    item = video()
+                    item["status"]["uploadStatus"] = upload
+                    item["snippet"]["liveBroadcastContent"] = state
+                    item["contentDetails"]["duration"] = "PT0S"
+                    item["liveStreamingDetails"] = live_details
+                    result = self.details([item])
+                    self.assertEqual([entry["id"] for entry in result], [item["id"]])
+                    self.assertEqual(result[0]["published"], item["snippet"]["publishedAt"])
+
+    def test_live_title_does_not_allow_an_unprocessed_regular_upload(self):
+        item = video()
+        item["snippet"]["title"] = "AO VIVO — preparação do próximo vídeo"
+        item["status"]["uploadStatus"] = "uploaded"
+        self.assertEqual(self.details([item]), [])
+
+    def test_live_flags_without_lifecycle_metadata_do_not_become_regular_videos(self):
+        for state in ("upcoming", "live"):
+            with self.subTest(state=state):
+                item = video()
+                item["snippet"]["liveBroadcastContent"] = state
+                self.assertEqual(self.details([item]), [])
+
+    def test_missing_transmission_dates_are_excluded_until_confirmed(self):
+        for state, live_details in (
+            ("upcoming", {}),
+            ("live", {}),
+            ("none", {"scheduledStartTime": "2026-11-05T12:00:00Z"}),
+            ("none", {"actualStartTime": "2026-11-03T12:00:00Z"}),
+        ):
+            with self.subTest(state=state, live_details=live_details):
+                item = video()
+                item["snippet"]["liveBroadcastContent"] = state
+                item["status"]["uploadStatus"] = "uploaded"
+                item["liveStreamingDetails"] = live_details
+                self.assertEqual(self.details([item]), [])
+
+    def test_present_but_invalid_transmission_metadata_is_an_incomplete_response(self):
+        for state, live_details in (
+            ("upcoming", {"scheduledStartTime": "not-a-date"}),
+            ("upcoming", {"scheduledStartTime": "2026-11-05T12:00:00"}),
+            ("upcoming", {"scheduledStartTime": 0}),
+            ("upcoming", {"scheduledStartTime": "2026-11-05T12:00:00Z", "actualStartTime": False}),
+            ("live", {"actualStartTime": "not-a-date"}),
+            ("live", {"actualStartTime": "2026-11-03T12:00:00"}),
+            ("live", {"actualStartTime": False}),
+            ("live", {"actualEndTime": "2026-11-03T13:00:00Z"}),
+            ("none", {"actualEndTime": "2026-11-03T13:00:00Z"}),
+            ("none", []),
+        ):
+            with self.subTest(state=state, live_details=live_details):
+                item = video()
+                item["snippet"]["liveBroadcastContent"] = state
+                item["status"]["uploadStatus"] = "uploaded"
+                item["liveStreamingDetails"] = live_details
+                with self.assertRaises(api.APIError) as caught:
+                    self.details([item])
+                self.assertEqual(caught.exception.reason, "response_incomplete")
+
+    def test_unknown_upload_status_is_not_accepted_for_a_transmission(self):
+        item = video()
+        item["snippet"]["liveBroadcastContent"] = "live"
+        item["status"]["uploadStatus"] = "unknown"
+        item["liveStreamingDetails"] = {"actualStartTime": "2026-11-03T12:00:00Z"}
+        with self.assertRaises(api.APIError) as caught:
+            self.details([item])
+        self.assertEqual(caught.exception.reason, "response_incomplete")
+
+    def test_live_privacy_and_failed_upload_states_stay_excluded(self):
+        for state, live_details in (
+            ("upcoming", {"scheduledStartTime": "2026-11-05T12:00:00Z"}),
+            ("live", {"actualStartTime": "2026-11-03T12:00:00Z"}),
+            ("none", {"actualStartTime": "2026-11-03T12:00:00Z",
+                      "actualEndTime": "2026-11-03T13:00:00Z"}),
+        ):
+            for privacy, upload in (("private", "uploaded"), ("unlisted", "uploaded"),
+                                    ("public", "deleted"), ("public", "failed"),
+                                    ("public", "rejected")):
+                with self.subTest(state=state, privacy=privacy, upload=upload):
+                    item = video()
+                    item["snippet"]["liveBroadcastContent"] = state
+                    item["status"].update(privacyStatus=privacy, uploadStatus=upload)
+                    item["liveStreamingDetails"] = live_details
+                    self.assertEqual(self.details([item]), [])
+
+    def test_upcoming_date_can_pass_without_inventing_a_live_start(self):
+        item = video()
+        item["snippet"]["liveBroadcastContent"] = "upcoming"
+        item["status"]["uploadStatus"] = "uploaded"
+        item["contentDetails"]["duration"] = "PT0S"
+        item["liveStreamingDetails"] = {"scheduledStartTime": "2026-11-03T12:00:00Z"}
+        result = self.details([item])
+        self.assertEqual(len(result), 1)
+        self.assertEqual(result[0]["sort_at"], "2026-11-02T12:00:00+00:00")
+
+    def test_future_live_schedule_does_not_take_priority_over_recent_content(self):
+        upcoming = video(1, "2026-11-01T12:00:00Z")
+        upcoming["snippet"]["liveBroadcastContent"] = "upcoming"
+        upcoming["status"]["uploadStatus"] = "uploaded"
+        upcoming["contentDetails"]["duration"] = "PT0S"
+        upcoming["liveStreamingDetails"] = {"scheduledStartTime": "2026-12-20T12:00:00Z"}
+        running = video(2, "2026-10-01T12:00:00Z")
+        running["snippet"]["liveBroadcastContent"] = "live"
+        running["status"]["uploadStatus"] = "uploaded"
+        running["contentDetails"]["duration"] = "PT0S"
+        running["liveStreamingDetails"] = {"actualStartTime": "2026-11-04T11:00:00Z"}
+        replay = video(3, "2026-11-01T12:00:00Z")
+        replay["status"]["uploadStatus"] = "uploaded"
+        replay["liveStreamingDetails"] = {"actualStartTime": "2026-11-03T10:00:00Z",
+                                          "actualEndTime": "2026-11-03T15:00:00Z"}
+        regular = video(4, "2026-11-03T14:00:00Z")
+        items = [upcoming, regular, replay, running]
+        with patch.object(api, "_urlopen", side_effect=self.successful_responses(items)):
+            result = self.fetch()
+        self.assertEqual([item["id"] for item in result], [running["id"], replay["id"]])
+        self.assertEqual(len(result), 2)
+        self.assertEqual(result[0]["sort_at"], "2026-11-04T11:00:00+00:00")
 
     def test_ended_live_is_ranked_by_end_without_changing_publication_date(self):
         replay = video(1, "2026-10-01T12:00:00Z")
@@ -175,6 +292,37 @@ class YouTubeAPITests(unittest.TestCase):
         self.assertEqual(result[0]["sort_at"], "2026-11-03T15:00:00+00:00")
         self.assertEqual(result[0]["type"], "LIVE GRAVADA")
 
+    def test_uploaded_replay_with_confirmed_end_is_eligible_before_final_processing(self):
+        replay = video(1, "2026-11-03T00:44:02Z")
+        replay["status"]["uploadStatus"] = "uploaded"
+        replay["contentDetails"]["duration"] = "PT1H49M8S"
+        replay["liveStreamingDetails"] = {"scheduledStartTime": "2026-11-03T00:44:01Z",
+                                         "actualStartTime": "2026-11-03T00:51:53Z",
+                                         "actualEndTime": "2026-11-03T02:41:01Z"}
+        result = self.details([replay])
+        self.assertEqual([item["id"] for item in result], [replay["id"]])
+        self.assertEqual(result[0]["type"], "LIVE GRAVADA")
+        self.assertEqual(result[0]["published"], "2026-11-03T00:44:02Z")
+        self.assertEqual(result[0]["sort_at"], "2026-11-03T02:41:01+00:00")
+
+    def test_ended_live_still_requires_positive_duration(self):
+        for upload in ("uploaded", "processed"):
+            with self.subTest(upload=upload):
+                item = video()
+                item["status"]["uploadStatus"] = upload
+                item["contentDetails"]["duration"] = "PT0S"
+                item["liveStreamingDetails"] = {"actualStartTime": "2026-11-03T12:00:00Z",
+                                                "actualEndTime": "2026-11-03T13:00:00Z"}
+                self.assertEqual(self.details([item]), [])
+
+    def test_live_actual_start_in_future_is_not_eligible(self):
+        item = video()
+        item["snippet"]["liveBroadcastContent"] = "live"
+        item["status"]["uploadStatus"] = "uploaded"
+        item["contentDetails"]["duration"] = "PT0S"
+        item["liveStreamingDetails"] = {"actualStartTime": "2026-11-05T12:00:00Z"}
+        self.assertEqual(self.details([item]), [])
+
     def test_live_started_without_end_future_publication_and_zero_duration_are_excluded(self):
         running, future, processing = video(1), video(2, "2026-11-05T00:00:00Z"), video(3)
         running["liveStreamingDetails"] = {"actualStartTime": "2026-11-03T12:00:00Z"}
@@ -182,10 +330,13 @@ class YouTubeAPITests(unittest.TestCase):
         self.assertEqual(self.details([running, future, processing]), [])
 
     def test_live_end_in_future_is_not_yet_eligible(self):
-        item = video()
-        item["liveStreamingDetails"] = {"actualStartTime": "2026-11-03T12:00:00Z",
-                                       "actualEndTime": "2026-11-05T12:00:00Z"}
-        self.assertEqual(self.details([item]), [])
+        for upload in ("uploaded", "processed"):
+            with self.subTest(upload=upload):
+                item = video()
+                item["status"]["uploadStatus"] = upload
+                item["liveStreamingDetails"] = {"actualStartTime": "2026-11-03T12:00:00Z",
+                                               "actualEndTime": "2026-11-05T12:00:00Z"}
+                self.assertEqual(self.details([item]), [])
 
     def test_embeddable_false_does_not_remove_public_youtube_link(self):
         item = video()

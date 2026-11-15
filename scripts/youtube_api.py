@@ -187,7 +187,12 @@ def _eligible_video(item: dict, channel_id: str, now: dt.datetime) -> dict | Non
     upload_status = status.get("uploadStatus")
     if upload_status not in ("processed", "uploaded", "deleted", "failed", "rejected"):
         raise APIError("response_incomplete")
-    if upload_status != "processed":
+    if upload_status not in ("processed", "uploaded"):
+        return None
+    is_broadcast = "liveStreamingDetails" in item
+    # The exception belongs to actual broadcast metadata, never to a title or
+    # upload status alone. Ordinary uploads still wait for processing to finish.
+    if upload_status != "processed" and not is_broadcast:
         return None
     snippet = item.get("snippet")
     details = item.get("contentDetails")
@@ -199,7 +204,7 @@ def _eligible_video(item: dict, channel_id: str, now: dt.datetime) -> dict | Non
     live_state = snippet.get("liveBroadcastContent")
     if not isinstance(title, str) or not title.strip() or live_state not in ("none", "live", "upcoming"):
         raise APIError("response_incomplete")
-    if live_state != "none":
+    if live_state != "none" and not is_broadcast:
         return None
     published = _timestamp(snippet.get("publishedAt"))
     if published > now:
@@ -208,27 +213,44 @@ def _eligible_video(item: dict, channel_id: str, now: dt.datetime) -> dict | Non
     match = _DURATION.fullmatch(duration) if isinstance(duration, str) else None
     if match is None or not any(value is not None for value in match.groups()):
         raise APIError("response_incomplete")
-    if not any(float(value) > 0 for value in match.groups() if value is not None):
-        return None
+    positive_duration = any(float(value) > 0 for value in match.groups() if value is not None)
     region = details.get("regionRestriction")
     if isinstance(region, dict) and region.get("allowed") == []:
         return None
     recency = published
     kind = "NO YOUTUBE"
-    if "liveStreamingDetails" in item:
+    if is_broadcast:
         live = item["liveStreamingDetails"]
         if not isinstance(live, dict):
             raise APIError("response_incomplete")
-        if not live.get("actualEndTime"):
-            return None
-        started = _timestamp(live.get("actualStartTime"))
-        ended = _timestamp(live["actualEndTime"])
-        if started > ended:
+        start_value = live.get("actualStartTime")
+        end_value = live.get("actualEndTime")
+        started = _timestamp(start_value) if start_value not in (None, "") else None
+        ended = _timestamp(end_value) if end_value not in (None, "") else None
+        if ended is not None and (started is None or started > ended):
             raise APIError("response_incomplete")
-        if ended > now:
+        if (started is not None and started > now) or (ended is not None and ended > now):
             return None
-        recency = max(published, ended)
-        kind = "LIVE GRAVADA"
+        if live_state == "upcoming":
+            scheduled = live.get("scheduledStartTime")
+            if scheduled in (None, ""):
+                return None
+            # A delayed schedule is still a public link. Neither a future nor
+            # a past scheduled time invents a live state or promotes the card.
+            _timestamp(scheduled)
+        elif live_state == "live":
+            if started is None:
+                return None
+        elif ended is None:
+            return None
+        if not positive_duration and (live_state == "none" or ended is not None):
+            return None
+        recency = max(value for value in (published, started, ended) if value is not None)
+        # These values are internal metadata; cards show only publication date,
+        # title and thumbnail, without asserting a current broadcast state.
+        kind = "LIVE GRAVADA" if ended is not None else "TRANSMISSÃO"
+    elif not positive_duration:
+        return None
     return {"id": item["id"], "title": title.strip(), "published": snippet["publishedAt"],
             "sort_at": recency.isoformat(timespec="seconds"), "type": kind,
             "thumbnail": f"https://i.ytimg.com/vi/{item['id']}/maxresdefault.jpg"}
@@ -266,8 +288,9 @@ def fetch_video_details(api_key, channel_id, ids, excluded_id="", now=None) -> l
 def fetch_recent_videos(api_key, channel_id, limit=2, excluded_id="", known_ids=(), now=None) -> list[dict]:
     """Discover every upload within a finite cap, then sort verified public media.
 
-    Live replays sort by max(publication, actual end); the original publication
-    remains in ``published``. An unfinished crawl cannot claim to find the latest.
+    Public broadcasts may be scheduled, ongoing or recorded. They sort by actual
+    publication/start/end, never a future schedule; ``published`` stays unchanged.
+    An unfinished crawl cannot claim to find the latest.
     """
     _arguments(api_key, channel_id, excluded_id)
     if isinstance(limit, bool) or not isinstance(limit, int) or not 1 <= limit <= 50:

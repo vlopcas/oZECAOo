@@ -276,57 +276,80 @@ class VideoSyncTests(unittest.TestCase):
         self.output = public_root / "dist" / "data" / "videos.json"
         self.published.return_value = baseline([video(2), video(1)])
 
-        def item(number, published, title, live=None):
+        def item(number, published, title, live=None, state="none", upload="processed", duration="PT20M"):
             result = {"id": video(number)["id"], "snippet": {"channelId": CHANNEL,
-                      "title": title, "publishedAt": published, "liveBroadcastContent": "none"},
-                      "status": {"privacyStatus": "public", "uploadStatus": "processed"},
-                      "contentDetails": {"duration": "PT20M"}}
+                      "title": title, "publishedAt": published, "liveBroadcastContent": state},
+                      "status": {"privacyStatus": "public", "uploadStatus": upload},
+                      "contentDetails": {"duration": duration}}
             if live:
                 result["liveStreamingDetails"] = live
             return result
 
-        raw = [item(1, "2026-11-01T12:00:00Z", "Vídeo anterior"),
-               item(2, "2026-11-03T12:00:00Z", "Jogo <especial> & gameplay"),
-               item(3, "2026-10-01T12:00:00Z", "Replay " + KEY,
-                    {"actualStartTime": "2026-11-04T12:00:00Z", "actualEndTime": "2026-11-04T14:00:00Z"})]
-        requested = []
+        cases = (
+            ("replay", "none", "2026-10-01T12:00:00Z", "01/10/2026", "PT1H49M8S",
+             {"actualStartTime": "2026-11-04T12:00:00Z", "actualEndTime": "2026-11-04T14:00:00Z"}),
+            ("live", "live", "2026-10-01T12:00:00Z", "01/10/2026", "PT0S",
+             {"actualStartTime": "2026-11-04T14:00:00Z"}),
+            ("upcoming", "upcoming", "2026-11-04T15:00:00Z", "04/11/2026", "PT0S",
+             {"scheduledStartTime": "2026-11-05T18:00:00Z"}),
+        )
+        for name, state, published, displayed_date, duration, live in cases:
+            with self.subTest(state=name):
+                raw = [item(1, "2026-11-01T12:00:00Z", "Vídeo anterior"),
+                       item(2, "2026-11-03T12:00:00Z", "Jogo <especial> & gameplay"),
+                       item(3, published, "Transmissão <sintética> & " + KEY, live,
+                            state=state, upload="uploaded", duration=duration),
+                       item(4, "2026-11-04T15:55:00Z", "Upload comum ainda em processamento",
+                            upload="uploaded")]
+                requested = []
 
-        def http(request, **kwargs):
-            requested.append(request)
-            parsed = urllib.parse.urlsplit(request.full_url)
-            self.assertNotIn(KEY, request.full_url)
-            self.assertEqual(request.get_header("X-goog-api-key"), KEY)
-            if parsed.path.endswith("/channels"):
-                payload = {"items": [{"id": CHANNEL, "contentDetails": {"relatedPlaylists": {"uploads": "UUtest"}}}]}
-            elif parsed.path.endswith("/playlistItems"):
-                payload = {"items": [{"contentDetails": {"videoId": value}} for value in
-                                     [TRAILER, video(1)["id"], video(2)["id"], video(3)["id"]]]}
-            elif parsed.path.endswith("/videos"):
-                payload = {"items": raw}
-            else:
-                self.fail("Unexpected endpoint")
-            return io.BytesIO(json.dumps(payload).encode())
+                def http(request, **kwargs):
+                    requested.append(request)
+                    parsed = urllib.parse.urlsplit(request.full_url)
+                    self.assertNotIn(KEY, request.full_url)
+                    self.assertEqual(request.get_header("X-goog-api-key"), KEY)
+                    if parsed.path.endswith("/channels"):
+                        payload = {"items": [{"id": CHANNEL, "contentDetails": {"relatedPlaylists": {"uploads": "UUtest"}}}]}
+                    elif parsed.path.endswith("/playlistItems"):
+                        payload = {"items": [{"contentDetails": {"videoId": value}} for value in
+                                             [TRAILER, *(entry["id"] for entry in raw)]]}
+                    elif parsed.path.endswith("/videos"):
+                        payload = {"items": raw}
+                    else:
+                        self.fail("Unexpected endpoint")
+                    return io.BytesIO(json.dumps(payload).encode())
 
-        with patch.object(api, "_urlopen", side_effect=http):
-            self.assertEqual(self.run_sync(), 0)
-        self.atom.assert_not_called()
-        self.assertEqual(len(requested), 3)
-        output = builder.build_site(public_root, feed_path=self.output)
-        feed = json.loads((output / "data" / "videos.json").read_text())
-        page = (output / "index.html").read_text()
-        self.assertEqual([v["id"] for v in feed["videos"]], [video(3)["id"], video(2)["id"]])
-        self.assertEqual(feed["videos"][0]["published"], "2026-10-01T12:00:00+00:00")
-        self.assertEqual(feed["source"], "youtube_data_api_v3")
-        self.assertEqual(feed["sync"]["state"], "UPDATED")
-        self.assertEqual(page.count('class="video-tile"'), 2)
-        self.assertIn("Jogo &lt;especial&gt; &amp; gameplay", page)
-        self.assertNotIn(f'data-video-id="{TRAILER}"', page)
-        self.assertNotIn("{{", page)
-        for path in output.rglob("*"):
-            if path.is_file():
-                self.assertNotIn(KEY.encode(), path.read_bytes(), str(path.relative_to(output)))
-        self.assertNotIn(KEY, self.logs)
-        self.assertNotIn(KEY, self.report_path.read_text())
+                with patch.object(api, "_urlopen", side_effect=http):
+                    self.assertEqual(self.run_sync(), 0)
+                self.atom.assert_not_called()
+                self.assertEqual(len(requested), 3)
+                output = builder.build_site(public_root, feed_path=self.output)
+                feed = json.loads((output / "data" / "videos.json").read_text())
+                page = (output / "index.html").read_text()
+                cards = page.split("<!-- site:videos:start -->", 1)[1].split("<!-- site:videos:end -->", 1)[0]
+                selected_card = cards.split(f'data-video-id="{video(3)["id"]}"', 1)[1].split("</a>", 1)[0]
+                self.assertEqual([v["id"] for v in feed["videos"]], [video(3)["id"], video(2)["id"]])
+                self.assertEqual(feed["videos"][0]["published"],
+                                 dt.datetime.fromisoformat(published.replace("Z", "+00:00")).isoformat(timespec="seconds"))
+                self.assertEqual(feed["source"], "youtube_data_api_v3")
+                self.assertEqual(feed["sync"]["state"], "UPDATED")
+                self.assertEqual(cards.count('class="video-tile"'), 2)
+                self.assertEqual(cards.count('class="video-photo"'), 2)
+                self.assertEqual(cards.count('class="video-date"'), 2)
+                self.assertEqual(cards.count("<h3>"), 2)
+                self.assertIn(f'<span class="video-date">{displayed_date}</span>', selected_card)
+                self.assertIn("Jogo &lt;especial&gt; &amp; gameplay", cards)
+                self.assertIn("Transmissão &lt;sintética&gt; &amp;", selected_card)
+                for label in ("TRANSMISSÃO", "LIVE GRAVADA", "AO VIVO", "EM BREVE"):
+                    self.assertNotIn(label, cards)
+                self.assertNotIn(f'data-video-id="{TRAILER}"', cards)
+                self.assertNotIn(f'data-video-id="{video(4)["id"]}"', cards)
+                self.assertNotIn("{{", page)
+                for path in output.rglob("*"):
+                    if path.is_file():
+                        self.assertNotIn(KEY.encode(), path.read_bytes(), str(path.relative_to(output)))
+                self.assertNotIn(KEY, self.logs)
+                self.assertNotIn(KEY, self.report_path.read_text())
 
 
 if __name__ == "__main__":

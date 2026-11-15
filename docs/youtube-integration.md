@@ -28,20 +28,27 @@ O workflow estava ativo, com `workflow_dispatch`, cron `17 1,7,13,19 * * *` em U
 
 1. **`youtube_data_api_v3`**: `channels.list(contentDetails)` obtém a playlist de uploads; `playlistItems.list` percorre as páginas; `videos.list` verifica os IDs em lotes. Os IDs do feed anteriormente publicado também são revalidados para evitar perder vídeos recentes por uma omissão da playlist.
 2. **`youtube_atom`**: usado apenas se a descoberta principal falhar. Os IDs anunciados no XML e os IDs anteriores passam pela mesma validação de `videos.list`. O título e os metadados usados no card vêm do recurso validado. Se a chave estiver ausente/inválida ou a quota esgotada, não se repete uma consulta autenticada sabidamente inútil.
-3. **`published_cache`**: se não for possível confirmar gravações elegíveis pelas fontes anteriores, mantém o último JSON publicado válido. Canal, IDs, títulos, limite e exclusão do trailer são validados. Se esse JSON também estiver indisponível ou inválido, retorna código 1 antes do build/deploy. A reserva versionada antiga nunca substitui o site em produção.
+3. **`published_cache`**: se não for possível confirmar conteúdos elegíveis pelas fontes anteriores, mantém o último JSON publicado válido. Canal, IDs, títulos, limite e exclusão do trailer são validados. Se esse JSON também estiver indisponível ou inválido, retorna código 1 antes do build/deploy. A reserva versionada antiga nunca substitui o site em produção.
 
-O Atom não expõe metadados suficientes para garantir que uma live terminou. A política aprovada é conservadora: **sem confirmação de disponibilidade e encerramento, preservar os anteriores**. Assim, o Atom pode recuperar uma falha da descoberta de canal/playlist quando a consulta de detalhes ainda funciona; uma indisponibilidade completa da API mantém o cache.
+O Atom não expõe metadados suficientes para comprovar privacidade, processamento e classificação da transmissão. A política aprovada em 15/11/2026 permite lives públicas agendadas, em andamento ou encerradas, mas **mantém a validação pela API antes de publicar novos conteúdos**. Assim, o Atom pode recuperar uma falha da descoberta de canal/playlist quando a consulta de detalhes ainda funciona; uma indisponibilidade completa da API mantém o cache.
 
 Critérios de elegibilidade:
 
 - ID válido, pertencente ao canal configurado, sem duplicatas e diferente de `trailerVideoId`.
-- `privacyStatus=public`, `uploadStatus=processed`, título e datas válidos e duração positiva.
-- Excluir `liveBroadcastContent=live` e `upcoming`, publicação futura e processamento incompleto.
-- Havendo `liveStreamingDetails`, exigir início e encerramento reais coerentes e já ocorridos.
+- `privacyStatus=public`, título e publicação válidos, sem publicação futura. Os estados `deleted`, `failed` e `rejected` são excluídos; estados ou metadados desconhecidos não liberam um candidato.
+- **Vídeo comum:** exigir `uploadStatus=processed`, `liveBroadcastContent=none` e duração positiva. Um upload comum ainda em envio/processamento continua fora.
+- **Live agendada:** aceitar `uploaded` ou `processed` quando o recurso tiver metadados válidos de transmissão e horário agendado válido. A duração pode ser zero. O horário previsto pode ter passado se a transmissão foi adiada; o relógio não transforma esse estado em "ao vivo".
+- **Live em andamento:** aceitar `uploaded` ou `processed` com início real válido e já ocorrido. Enquanto não houver fim real, a duração pode ser zero; um fim já informado também exige coerência e duração positiva.
+- **Live encerrada:** aceitar `uploaded` ou `processed` com início e fim reais coerentes e já ocorridos, além de duração positiva.
+- A classificação usa os campos da API, não o título ou a presença do texto "AO VIVO". O site não exibe selos de estado nem promete acompanhamento instantâneo da transmissão.
 - IDs omitidos por `videos.list` são indisponíveis para aquela consulta pública. Um recurso retornado sem partes obrigatórias torna a resposta inconsistente e aciona a alternativa.
 - `embeddable=false` não remove o vídeo: os cards abrem o YouTube, não incorporam esses vídeos.
 
-A seleção considera todos os candidatos descobertos e ordena por `sort_at` decrescente, com desempate por ID. Vídeos comuns usam `snippet.publishedAt`; lives encerradas usam o máximo entre publicação e `actualEndTime`. O campo `published` preserva a publicação original, exibida pelo site em Brasília. A data de adição à playlist não determina recência.
+A seleção considera todos os candidatos descobertos e ordena por `sort_at` decrescente, com desempate por ID. Vídeos comuns usam `snippet.publishedAt`; lives usam o máximo entre a publicação e os horários reais de início/fim já ocorridos. O horário futuro agendado não determina recência. O campo `published` preserva a publicação original, exibida pelo site em Brasília. A data de adição à playlist também não determina recência.
+
+Os dois cards continuam mostrando somente thumbnail, data e título, com link para o YouTube. O campo `type` permanece compatível no JSON, mas não produz um rótulo visual. Uma live não ganha destaque separado nem altera a quantidade de cards ao começar ou terminar.
+
+A motivação da nova política foi confirmada no [diagnóstico de 15/11/2026](https://github.com/vlopcas/oZECAOo/actions/runs/43732824212): a live `bYh315u3yhs` era pública, encerrada, com duração positiva e presente na playlist de uploads, mas ainda tinha `uploadStatus=uploaded`. O filtro anterior exigia `processed` para todos os formatos e a descartava. Isso comprova a resposta naquele diagnóstico, sem reconstruir o status que a API havia retornado em execuções anteriores.
 
 São até 50 itens por página, dez páginas de uploads e lotes de 50 IDs para detalhes. Se a paginação não terminar nesse teto, a descoberta é considerada incompleta. Uma seleção com menos itens que o limite configurado também não confirma uma atualização completa. O limite de produção continua sendo dois cards. Canal e playlist válidos costumam exigir três chamadas; cada uma dessas operações custa uma unidade segundo a documentação oficial. O teto de descoberta e a revalidação dos IDs conhecidos podem ampliar esse custo; retries também consomem quota. Não se usa `search.list`.
 
@@ -58,7 +65,7 @@ O JSON publicado é lido como referência antes da descoberta autenticada e como
 | Estado | Significado | Publicação |
 | --- | --- | --- |
 | `UPDATED` | Consulta válida atualizou ou confirmou a seleção; não precisa haver um vídeo novo. | Pode continuar. |
-| `PRESERVED` | Fontes não confirmaram gravações atuais; manteve o JSON publicado validado. | Pode continuar, com warning explícito. |
+| `PRESERVED` | Fontes não confirmaram conteúdos atuais; manteve o JSON publicado validado. | Pode continuar, com warning explícito. |
 | `FAILED` | Não conseguiu consultar nem preservar dados válidos. | Código 1; build/deploy não executam. |
 
 `source`, `channel_id` e `videos` continuam disponíveis. O bloco público `sync` contém `state`, `attempted_at`, `last_success_at` e `last_success_source`. `sort_at` é opcional por vídeo; o frontend continua usando seus campos anteriores. O build copia apenas campos permitidos: respostas brutas, credenciais e o relatório interno não são artefatos públicos.
@@ -83,7 +90,7 @@ python3 -m compileall -q scripts tests
 git diff --check
 ```
 
-Os testes usam respostas sintéticas e mocks; não precisam de chave nem fazem chamadas reais ao YouTube. Testam API, lives, paginação, seleção, erros transitórios/permanentes, fallback validado, preservação, estados, resumo, build e ausência de credenciais em logs/artefatos. `--fixture caminho/feed.xml` é uma ferramenta offline de teste do contrato do feed, sem consultas autenticadas ou de recuperação.
+Os testes usam respostas sintéticas e mocks; não precisam de chave nem fazem chamadas reais ao YouTube. Testam API, vídeos comuns ainda em upload, lives públicas agendadas/ativas/encerradas, metadados incoerentes, paginação, seleção, erros transitórios/permanentes, fallback validado, preservação, estados, resumo, build e ausência de credenciais em logs/artefatos. `--fixture caminho/feed.xml` é uma ferramenta offline de teste do contrato do feed, sem consultas autenticadas ou de recuperação.
 
 Para conferir a página offline com a reserva revisada, sem comprovar atualização do YouTube:
 
@@ -116,7 +123,7 @@ Para verificar as próximas execuções:
 
 1. Em **Actions → ZECAO • Atualização do YouTube e publicação**, use **Run workflow** na `main` ou acompanhe a execução do push aprovado.
 2. Confira **`UPDATED` + `youtube_data_api_v3`** no Step Summary. Isso deve comprovar consulta ao canal configurado, descoberta da uploads, validação dos recursos e seleção; `PRESERVED` ainda indica um problema de atualização.
-3. Confira os dois IDs/títulos apresentados e compare com os vídeos públicos e lives encerradas do canal. Verifique a ausência de trailer, transmissão futura e live em andamento.
+3. Confira os dois IDs/títulos apresentados e compare com os vídeos comuns publicados e as lives públicas do canal, inclusive agendadas, em andamento ou encerradas. Verifique a ausência do trailer e de uploads comuns ainda não processados; não espere selos de estado nos cards.
 4. Confira build e deploy como `success`. Abra [o JSON público](https://ozecaoo.com/data/videos.json), verifique `source`, `sync` e os mesmos IDs no HTML da [home](https://ozecaoo.com/).
 5. Inspecione os logs e o artefato de Pages sem revelar o secret. Nenhum valor de credencial deve estar no HTML, JS, JSON ou relatório público.
 
@@ -126,6 +133,8 @@ O secret já está configurado e funcionou na execução real; não há configur
 
 Consulte primeiro o **estado de sincronização**, depois a fonte e os motivos de fallback. `api_key_missing`, `api_key_invalid`, `quota_exceeded` e `forbidden` indicam configuração/autorização/quota; não devem ser confundidos com Atom 404. Falha temporária de rede/servidor tem retries limitados. `discovery_truncated`, `response_incomplete` e `insufficient_videos` indicam que a API não comprovou a seleção completa.
 
-O cache pode permanecer antigo durante uma indisponibilidade prolongada, mas sua idade e o estado `PRESERVED` ficam explícitos. O script não inventa data de atualização nem vídeos. Metadados públicos não garantem reprodução em todos os países, disponibilidade imediata da transcodificação ou restrições particulares de cada espectador; o controle final é do YouTube. O teto de descoberta e a política conservadora podem preservar o cache quando não é possível comprovar a seleção.
+O cache pode permanecer antigo durante uma indisponibilidade prolongada, mas sua idade e o estado `PRESERVED` ficam explícitos. O script não inventa data de atualização nem vídeos. Aceitar uma live encerrada como `uploaded` identifica metadados de replay; não equivale a afirmar que todas as qualidades terminaram de processar. Metadados públicos não garantem reprodução em todos os países, disponibilidade imediata da transcodificação ou restrições particulares de cada espectador; o controle final é do YouTube. O teto de descoberta e a validação obrigatória podem preservar o cache quando não é possível comprovar a seleção.
+
+O WebSub continua acelerando a descoberta e o agendamento permanece com quatro execuções previstas por dia para reconciliar eventos ausentes. Não se monitora cada mudança entre agendada, ativa e encerrada para atualizar um selo visual. Nenhuma chave adicional é exigida no Worker ou no navegador por essa política.
 
 Referências oficiais: [channels.list](https://developers.google.com/youtube/data/reference/rest/v3/channels/list), [playlistItems.list](https://developers.google.com/youtube/data/reference/rest/v3/playlistItems/list), [videos.list](https://developers.google.com/youtube/data/reference/rest/v3/videos/list), [campos de vídeo e lives](https://developers.google.com/youtube/data/reference/rest/v3/videos), [erros da API](https://developers.google.com/youtube/data/reference/rest/v3/errors) e [API key em cabeçalho](https://docs.cloud.google.com/apis/docs/system-parameters).

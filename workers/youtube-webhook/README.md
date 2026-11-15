@@ -147,17 +147,17 @@ Os testes automatizados são simulados e não fazem POST no hub ou dispatch real
 
 O Step Summary diferencia `schedule`, `manual`, `websub` e `websub_test`. IDs anunciados são contexto: nunca alteram a seleção validada pelo Python. O workflow continua funcionando por agendamento e pelo botão Run workflow.
 
-O YouTube documenta upload e alterações de título/descrição. Não garante notificar início/fim de live ou momento exato de disponibilização da gravação. Não há promessa de atualização instantânea desses estados. Por isso, manter a reconciliação a cada seis horas é prudente para esse canal; reduzir para duas execuções diárias pode deixar gravações de lives até doze horas sem descoberta. Monitoramento dedicado de AO VIVO é uma evolução separada.
+O YouTube documenta upload e alterações de título/descrição. Não garante notificar início/fim de live ou momento exato de disponibilização da gravação. Os dois cards podem incluir links públicos de transmissões agendadas, em andamento ou encerradas, mostrando somente thumbnail, data de publicação e título. O site não afirma o estado atual da transmissão; não precisa receber cada transição para manter um link válido. A reconciliação a cada seis horas continua cobrindo publicações e alterações não notificadas; reduzir para duas execuções diárias pode alongar essa descoberta até doze horas. Monitoramento dedicado de AO VIVO permanece fora desta solução.
 
 | Situação | Cobertura e comportamento |
 | --- | --- |
 | Novo upload | Evento documentado pelo YouTube; o Worker agenda a consulta e a API confirma a elegibilidade. |
 | Vídeo publicado | Uploads públicos podem atualizar o site por evento; não há garantia documentada para toda transição de privacidade/publicação. A reconciliação cobre ausências. |
 | Título/descrição alterados | Ambos são documentados; mudanças apenas na descrição não disparam rebuild, pois os cards não a exibem. |
-| Live agendada | Pode gerar entrada no feed, sem garantia específica. O Python exclui conteúdo ainda indisponível. |
-| Live iniciada | WebSub não garante esse sinal; o site não é um indicador de AO VIVO. |
-| Live encerrada | WebSub não garante esse sinal; a reconciliação consulta o estado na API. |
-| Gravação disponibilizada | A API valida a gravação disponível. Sem evento, a descoberta aguarda reconciliação ou execução manual. |
+| Live agendada | Link público pode entrar nos dois cards após validação pela API. Horário previsto não vira confirmação de início nem prioridade por uma data futura. |
+| Live iniciada | Link público continua elegível, inclusive com duração ainda zerada. WebSub não garante esse sinal; nenhum selo de AO VIVO é exibido. |
+| Live encerrada | Link público com início/fim e duração válidos pode entrar mesmo com `uploadStatus=uploaded`. A exceção não se aplica aos uploads comuns. |
+| Gravação disponibilizada | A reconciliação mantém os dados atualizados sem exigir um novo evento de término/processamento. Sem notificação, novas descobertas aguardam agendamento ou execução manual. |
 
 Resultados da instalação e links de execuções: [validação de 4 de novembro de 2026](../../docs/websub-validation-2026-11-04.md).
 
